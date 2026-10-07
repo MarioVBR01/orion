@@ -48,3 +48,59 @@ body {
 @utility card {
   @apply rounded-xl border border-gray-200 bg-white shadow-sm;
 }
+
+/* Markdown renderizado */
+.md {
+  @apply text-sm leading-relaxed text-gray-800;
+}
+.md > * + * {
+  @apply mt-3;
+}
+.md h1 {
+  @apply text-xl font-bold;
+}
+.md h2 {
+  @apply text-lg font-semibold;
+}
+.md h3 {
+  @apply text-base font-semibold;
+}
+.md ul {
+  @apply list-disc pl-5;
+}
+.md ol {
+  @apply list-decimal pl-5;
+}
+.md li + li {
+  @apply mt-1;
+}
+.md a {
+  @apply text-brand underline;
+}
+.md code {
+  @apply rounded bg-gray-100 px-1 py-0.5 text-[13px];
+}
+.md pre {
+  @apply overflow-x-auto rounded-lg bg-gray-900 p-3 text-gray-100;
+}
+.md pre code {
+  @apply bg-transparent p-0;
+}
+.md blockquote {
+  @apply border-l-4 border-gray-200 pl-3 text-gray-600;
+}
+.md table {
+  @apply w-full border-collapse text-left;
+}
+.md th,
+.md td {
+  @apply border border-gray-200 px-2 py-1;
+}
+.md img {
+  @apply max-w-full rounded-lg;
+}
+
+/* Scroll fino para columnas del tablero */
+.thin-scroll {
+  scrollbar-width: thin;
+}

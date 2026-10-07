@@ -1,5 +1,18 @@
 import { QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { Person, PersonRole, Project, ProjectInput, Settings } from '@shared/types'
+import type {
+  BulkAction,
+  Card,
+  CardInput,
+  CardPatch,
+  Comment,
+  HistoryEntry,
+  MoveInput,
+  Person,
+  PersonRole,
+  Project,
+  ProjectInput,
+  Settings,
+} from '@shared/types'
 
 export class ApiError extends Error {
   constructor(
@@ -110,6 +123,78 @@ export function usePeopleMutations(projectId: number) {
     remove: useMutation({
       mutationFn: (id: number) => api<void>(`/projects/${projectId}/people/${id}`, { method: 'DELETE' }),
       onSuccess: done,
+    }),
+  }
+}
+
+// ---------- Tarjetas ----------
+export const cardKeys = {
+  all: (pid: number) => ['projects', pid, 'cards'] as const,
+  list: (pid: number, archived = false) => ['projects', pid, 'cards', { archived }] as const,
+  comments: (pid: number, n: number) => ['projects', pid, 'cards', n, 'comments'] as const,
+  history: (pid: number, n: number) => ['projects', pid, 'cards', n, 'history'] as const,
+  activity: (pid: number) => ['projects', pid, 'activity'] as const,
+}
+
+export function useCards(pid: number, archived = false) {
+  return useQuery({
+    queryKey: cardKeys.list(pid, archived),
+    queryFn: () => api<Card[]>(`/projects/${pid}/cards${archived ? '?archived=1' : ''}`),
+  })
+}
+export function useComments(pid: number, n: number) {
+  return useQuery({ queryKey: cardKeys.comments(pid, n), queryFn: () => api<Comment[]>(`/projects/${pid}/cards/${n}/comments`) })
+}
+export function useCardHistory(pid: number, n: number) {
+  return useQuery({ queryKey: cardKeys.history(pid, n), queryFn: () => api<HistoryEntry[]>(`/projects/${pid}/cards/${n}/history`) })
+}
+export function useActivity(pid: number, enabled: boolean) {
+  return useQuery({ queryKey: cardKeys.activity(pid), queryFn: () => api<HistoryEntry[]>(`/projects/${pid}/activity?limit=200`), enabled })
+}
+
+export function useCardMutations(pid: number) {
+  const qc = useQueryClient()
+  const refresh = () => {
+    void qc.invalidateQueries({ queryKey: cardKeys.all(pid) })
+    void qc.invalidateQueries({ queryKey: cardKeys.activity(pid) })
+    void qc.invalidateQueries({ queryKey: keys.project(pid), exact: true })
+    void qc.invalidateQueries({ queryKey: keys.projects, exact: true })
+  }
+  const patchLocal = (number: number, fn: (c: Card) => Card) =>
+    qc.setQueryData<Card[]>(cardKeys.list(pid), (old) => old?.map((c) => (c.number === number ? fn(c) : c)))
+
+  return {
+    create: useMutation({
+      mutationFn: (input: CardInput) => api<Card>(`/projects/${pid}/cards`, { method: 'POST', body: input }),
+      onSettled: refresh,
+    }),
+    update: useMutation({
+      mutationFn: ({ number, ...patch }: { number: number } & CardPatch) =>
+        api<Card>(`/projects/${pid}/cards/${number}`, { method: 'PATCH', body: patch }),
+      onSuccess: (card) => patchLocal(card.number, () => card),
+      onSettled: refresh,
+    }),
+    /** Movimiento optimista: la tarjeta cambia de columna al instante y se revierte si el servidor la rechaza. */
+    move: useMutation({
+      mutationFn: ({ number, ...input }: { number: number } & MoveInput) =>
+        api<Card>(`/projects/${pid}/cards/${number}/move`, { method: 'POST', body: input }),
+      onMutate: async ({ number, column, order }) => {
+        await qc.cancelQueries({ queryKey: cardKeys.list(pid) })
+        const previous = qc.getQueryData<Card[]>(cardKeys.list(pid))
+        patchLocal(number, (c) => ({ ...c, column, order: order ?? c.order }))
+        return { previous }
+      },
+      onError: (_e, _v, ctx) => ctx?.previous && qc.setQueryData(cardKeys.list(pid), ctx.previous),
+      onSettled: refresh,
+    }),
+    bulk: useMutation({
+      mutationFn: (body: { numbers: number[]; op: BulkAction }) => api<Card[]>(`/projects/${pid}/cards/bulk`, { method: 'POST', body }),
+      onSettled: refresh,
+    }),
+    comment: useMutation({
+      mutationFn: ({ number, text }: { number: number; text: string }) =>
+        api<Comment>(`/projects/${pid}/cards/${number}/comments`, { method: 'POST', body: { text } }),
+      onSettled: refresh,
     }),
   }
 }

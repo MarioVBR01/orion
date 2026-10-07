@@ -3,6 +3,7 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { ProjectsPage } from '@/features/projects/ProjectsPage'
 import { ComingSoon, ProjectLayout } from '@/features/project/ProjectLayout'
 import { PeopleTab } from '@/features/project/PeopleTab'
+import { BoardTab } from '@/features/board/BoardTab'
 import { ToastProvider } from '@/components/Toast'
 import { EmptyState } from '@/components/ui'
 import { queryClient } from '@/lib/api'
@@ -19,7 +20,7 @@ export function App() {
               <Route path="/proyectos" element={<ProjectsPage />} />
               <Route path="/proyectos/:pid" element={<ProjectLayout />}>
                 <Route path="brief" element={<ComingSoon title="Brief" phase={6} />} />
-                <Route path="tablero" element={<ComingSoon title="Tablero" phase={2} />} />
+                <Route path="tablero" element={<BoardTab />} />
                 <Route path="por-revisar" element={<ComingSoon title="Por revisar" phase={3} />} />
                 <Route path="rounds" element={<ComingSoon title="Rounds" phase={4} />} />
                 <Route path="testing" element={<ComingSoon title="Testing" phase={6} />} />

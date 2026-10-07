@@ -59,3 +59,129 @@ export interface Person {
 export interface Settings {
   userName: string
 }
+
+// ---------- Tarjetas ----------
+
+export type CardType = 'tarea' | 'bug' | 'historia'
+export type Priority = 'alta' | 'media' | 'baja'
+export const CARD_TYPES: CardType[] = ['tarea', 'bug', 'historia']
+export const PRIORITIES: Priority[] = ['alta', 'media', 'baja']
+export const TYPE_LABEL: Record<CardType, string> = { tarea: 'Tarea', bug: 'Bug', historia: 'Historia' }
+export const PRIORITY_LABEL: Record<Priority, string> = { alta: 'Alta', media: 'Media', baja: 'Baja' }
+
+/** Asignado especial: Claude Code (vía MCP). */
+export const CLAUDE = 'claude'
+
+/** Reporte estructurado: ¿Dónde? / ¿Qué hice? / ¿Qué esperaba? / ¿Qué pasó? */
+export interface Report {
+  where: string
+  steps: string[]
+  expected: string
+  actual: string
+}
+
+export interface AcceptanceItem {
+  text: string
+  done: boolean
+}
+
+export interface Attachment {
+  name: string
+  url: string
+  type: string
+  size: number
+}
+
+export interface Card {
+  id: number
+  projectId: number
+  number: number
+  title: string
+  type: CardType
+  priority: Priority
+  column: ColumnId
+  order: string
+  labels: string[]
+  /** nombre de la persona, 'claude' o null */
+  assignee: string | null
+  descriptionMd: string
+  report: Report | null
+  acceptance: AcceptanceItem[]
+  attachments: Attachment[]
+  sprintId: number | null
+  versionId: number | null
+  branch: string | null
+  prUrl: string | null
+  commitSha: string | null
+  sourceObservationIds: number[]
+  createdBy: string
+  createdAt: string
+  updatedAt: string
+  archived: boolean
+}
+
+export interface CardInput {
+  title: string
+  type: CardType
+  priority: Priority
+  column?: ColumnId
+  labels?: string[]
+  assignee?: string | null
+  descriptionMd?: string
+  report?: Report | null
+  acceptance?: AcceptanceItem[]
+}
+
+export type CardPatch = Partial<
+  Pick<
+    Card,
+    | 'title'
+    | 'type'
+    | 'priority'
+    | 'labels'
+    | 'assignee'
+    | 'descriptionMd'
+    | 'report'
+    | 'acceptance'
+    | 'branch'
+    | 'prUrl'
+    | 'commitSha'
+    | 'archived'
+  >
+>
+
+export interface MoveInput {
+  column: ColumnId
+  /** clave de orden calculada por el cliente; si falta, va al final de la columna */
+  order?: string
+  comment?: string
+}
+
+export type BulkAction =
+  | { action: 'move'; column: ColumnId }
+  | { action: 'assign'; assignee: string | null }
+  | { action: 'label'; label: string }
+  | { action: 'archive' }
+
+export interface Comment {
+  id: number
+  cardId: number
+  author: string
+  text: string
+  createdAt: string
+}
+
+export type HistoryAction = 'creada' | 'movida' | 'editada' | 'comentada' | 'archivada' | 'restaurada' | 'trabajo'
+
+export interface HistoryEntry {
+  id: number
+  cardId: number
+  cardNumber: number
+  cardTitle: string
+  actor: string
+  action: HistoryAction
+  from: string | null
+  to: string | null
+  detail: string | null
+  at: string
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { keyBetween, keysBetween } from '../../src/lib/order'
+import { keyBetween, keysBetween } from '../../shared/order'
 
 describe('keyBetween', () => {
   it('genera clave inicial', () => {

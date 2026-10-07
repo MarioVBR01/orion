@@ -70,3 +70,10 @@ describe('API de personas y ajustes', () => {
     expect(r.body.userName).toBe('Mario Victor')
   })
 })
+
+describe('errores', () => {
+  it('JSON mal formado es 400, no 500', async () => {
+    const r = await request(app).post('/api/projects').set('Content-Type', 'application/json').send('{malo')
+    expect(r.status).toBe(400)
+  })
+})

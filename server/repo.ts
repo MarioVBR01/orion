@@ -1,7 +1,8 @@
 import { COLUMN_IDS, type ColumnCounts, type Person, type PersonRole, type Project, type ProjectInput, type Settings } from '../shared/types'
 import { now, type Db } from './db'
+import { NotFoundError } from './errors'
 
-export class NotFoundError extends Error {}
+export { NotFoundError }
 
 interface ProjectRow {
   id: number

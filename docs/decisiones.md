@@ -17,3 +17,16 @@ El usuario decidió no usar Firebase: ORION será local y solo lo usará él. Fi
 9. **Orden de tarjetas:** fractional indexing con claves string base-62 (`src/lib/order.ts`).
 10. **Migraciones** versionadas con `PRAGMA user_version` en `server/db.ts`.
 11. **Fechas** en ISO (UTC) en la base; se muestran con `Intl.DateTimeFormat('es-BO')`.
+
+## Fase 2: tablero
+
+12. **Identificador de tarjeta en la URL y la API:** el `number` del proyecto (#1871), no el id interno. Así coincide con lo que se ve y con lo que usará el MCP.
+13. **Actor:** las acciones desde la web se registran con el nombre de Ajustes. El MCP registrará `claude`.
+14. **Reglas del flujo en el servidor** (`shared/flow.ts`, usado por `server/cards.ts`): Claude solo mueve entre Backlog, Por hacer, En progreso y En revisión QA, y nunca a Hecho. Devolver de "En revisión humano" a "Por hacer" exige comentario, que se guarda como comentario de la tarjeta y en el historial. El humano puede mover libremente.
+15. **💡 Ideas:** captura rápida que crea tarjetas en Backlog con la etiqueta `idea` (tipo historia, prioridad baja). Es la interpretación más simple de "ideas/sugerencias".
+16. **⋮ Más opciones:** seleccionar las tarjetas visibles, ver y restaurar archivadas, y exportar el tablero a JSON.
+17. **Acciones masivas** (mover, asignar, etiquetar, archivar) se ejecutan en una sola transacción: si una tarjeta viola el flujo, no se aplica ninguna.
+18. **Movimiento optimista:** la tarjeta cambia de columna al instante y vuelve a su lugar si el servidor rechaza el movimiento.
+19. **Con búsqueda activa**, el orden de una tarjeta arrastrada se calcula entre sus vecinas visibles.
+20. **Sprints:** el selector y el filtro por sprint quedan para la fase 6, junto con el burndown.
+21. **Adjuntos de tarjeta:** por ahora solo se muestran. La subida llega en la fase 3, con las observaciones.

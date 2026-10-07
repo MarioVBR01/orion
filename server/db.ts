@@ -64,6 +64,30 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX cards_board ON cards (project_id, archived, column_id, ord);
   `,
+  /* 2: comentarios e historial */ `
+  CREATE TABLE comments (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    card_id    INTEGER NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+    author     TEXT NOT NULL,
+    text       TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX comments_card ON comments (card_id, id);
+
+  CREATE TABLE history (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    card_id    INTEGER NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+    actor      TEXT NOT NULL,
+    action     TEXT NOT NULL,
+    from_value TEXT,
+    to_value   TEXT,
+    detail     TEXT,
+    at         TEXT NOT NULL
+  );
+  CREATE INDEX history_card ON history (card_id, id);
+  CREATE INDEX history_project ON history (project_id, id);
+  `,
 ]
 
 export function openDb(file: string): Db {
