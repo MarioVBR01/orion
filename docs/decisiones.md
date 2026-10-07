@@ -4,7 +4,7 @@ Registro de decisiones tomadas cuando el spec era ambiguo o hubo que ajustarlo.
 
 ## Cambio de rumbo: app local de un solo usuario
 
-El usuario decidió no usar Firebase: ORION será local y solo lo usará él. Firebase, Hosting, Auth, roles, reglas, invitaciones y CI de deploy quedan fuera del alcance. Las fases 1 a 3 del historial de git tenían la versión con Firebase, por si algún día se retoma.
+El usuario decidió no usar Firebase: ORION será local y solo lo usará él. Firebase, Hosting, Auth, roles, reglas, invitaciones y CI de deploy quedan fuera del alcance. Los tres primeros commits del historial de git tienen la versión con Firebase, por si algún día se retoma.
 
 1. **Arquitectura:** servidor Express local y base SQLite (`data/orion.db`). Se descartó guardar en el navegador (IndexedDB) porque el servidor MCP (fase 5) tiene que leer y mover tarjetas, y no puede acceder al almacenamiento del navegador. El MCP reutilizará `server/repo.ts` sobre el mismo archivo.
 2. **SQLite integrado de Node (`node:sqlite`)** en lugar de `better-sqlite3`, que se cae con Node 22.12 en esta máquina. En Node 22.12 se necesita la opción `--experimental-sqlite` (ya está en los scripts); desde Node 22.13 no hace falta.
