@@ -2,7 +2,6 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from '@/features/auth/AuthProvider'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { SetupPage } from '@/features/auth/SetupPage'
-import { ChangePasswordPage } from '@/features/auth/ChangePasswordPage'
 import { ProjectsPage } from '@/features/projects/ProjectsPage'
 import { ComingSoon, ProjectLayout } from '@/features/project/ProjectLayout'
 import { MembersTab } from '@/features/project/MembersTab'
@@ -35,7 +34,6 @@ export function App() {
               <Route path="/mensajes" element={<ComingSoon title="Mensajes" phase={6} />} />
               <Route path="/usuarios" element={<UsersPage />} />
               <Route path="/testers" element={<ComingSoon title="Testers" phase={6} />} />
-              <Route path="/cambiar-contrasena" element={<ChangePasswordPage />} />
               <Route path="*" element={<EmptyState title="Página no encontrada" />} />
             </Route>
           </Routes>

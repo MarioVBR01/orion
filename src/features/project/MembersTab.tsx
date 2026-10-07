@@ -7,7 +7,8 @@ import { useUsers } from '@/features/users/useUsers'
 import { Avatar, EmptyState, Skeleton } from '@/components/ui'
 import { errorMessage, useToast } from '@/components/Toast'
 import { can, ROLE_LABEL } from '@/lib/permissions'
-import { PROJECT_ROLES, type ProjectRole } from '@/types'
+import { upsertInvite } from '@/lib/users'
+import { PROJECT_ROLES, type GlobalRole, type ProjectRole } from '@/types'
 import { useProjectCtx } from './ProjectContext'
 
 export function MembersTab() {
@@ -24,7 +25,18 @@ export function MembersTab() {
     e.preventDefault()
     const user = users?.find((u) => u.email === email.trim().toLowerCase())
     if (!user) {
-      toast.error('No existe un usuario con ese correo. Créalo primero en Usuarios o Testers.')
+      // Sin cuenta todavía: queda invitado y se une al proyecto en su primer ingreso con Google.
+      setBusy(true)
+      try {
+        const globalRole: GlobalRole = newRole === 'project_manager' ? 'project_manager' : newRole === 'viewer' ? 'cliente' : newRole
+        await upsertInvite({ email, globalRole, projects: { [project.id]: newRole }, createdBy: me.id })
+        toast.success('Invitación enviada. Se unirá al proyecto al entrar con Google.')
+        setEmail('')
+      } catch (err) {
+        toast.error(errorMessage(err))
+      } finally {
+        setBusy(false)
+      }
       return
     }
     if (members?.some((m) => m.id === user.id)) {

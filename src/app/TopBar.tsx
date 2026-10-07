@@ -54,9 +54,6 @@ export function TopBar() {
           <span className="text-[15px] text-gray-800">
             {me.name} <span className="text-xs text-gray-400">({me.globalRole})</span>
           </span>
-          <Link to="/cambiar-contrasena" className="text-[15px] text-gray-700 hover:text-gray-900">
-            Cambiar contraseña
-          </Link>
           <button onClick={logout} className="btn-outline">Cerrar sesión</button>
         </div>
 
@@ -74,7 +71,6 @@ export function TopBar() {
                 {!!l.badge && <span className="rounded-full bg-red-600 px-1.5 text-[11px] font-semibold text-white">{badgeCount(l.badge)}</span>}
               </NavLink>
             ))}
-            <NavLink to="/cambiar-contrasena" className={navClass}>Cambiar contraseña</NavLink>
           </nav>
           <div className="mt-4 flex items-center justify-between">
             <span className="text-sm">{me.name} <span className="text-xs text-gray-400">({me.globalRole})</span></span>

@@ -56,11 +56,31 @@ service cloud.firestore {
         && existsAfter(/databases/$(database)/documents/meta/bootstrap);
     }
 
+    // ---------- Invitaciones (login con Google) ----------
+    // invites/{email}: { email, name, globalRole, projects: { pid: rol }, createdBy }
+    // El invitado, al entrar por primera vez con Google, "reclama" su invitación.
+    function myEmail() { return request.auth.token.email.lower(); }
+    function invitePath() { return /databases/$(database)/documents/invites/$(myEmail()); }
+    function hasInvite() {
+      return signedIn() && request.auth.token.email_verified == true && exists(invitePath());
+    }
+    function myInvite() { return get(invitePath()).data; }
+    function invitedTo(pid) { return hasInvite() && myInvite().projects.get(pid, null) != null; }
+
+    match /invites/{email} {
+      allow read: if canCreateProjects() || (signedIn() && email == myEmail());
+      allow create, update: if email == request.resource.data.email
+        && (isAdmin() || (canCreateProjects() && request.resource.data.globalRole in limitedRoles()));
+      allow delete: if canCreateProjects() || (signedIn() && email == myEmail());
+    }
+
     match /users/{uid} {
       allow read: if isActive() || (signedIn() && request.auth.uid == uid);
-      allow create: if isAdmin()
-        || (canCreateProjects() && request.resource.data.globalRole in limitedRoles())
-        || isBootstrap(uid);
+      allow create: if isBootstrap(uid)
+        || (signedIn() && request.auth.uid == uid && hasInvite()
+            && request.resource.data.globalRole == myInvite().globalRole
+            && request.resource.data.email == myEmail()
+            && request.resource.data.active == true);
       allow update: if isAdmin()
         || (canCreateProjects()
             && resource.data.globalRole in limitedRoles()
@@ -99,6 +119,10 @@ service cloud.firestore {
 
       allow update: if (isPM(pid) && request.resource.data.number == resource.data.number)
         // cualquier miembro puede marcar/desmarcar su propia estrella
+        // el invitado se agrega a sí mismo a memberIds al reclamar su invitación
+        || (invitedTo(pid) && changedOnly(['memberIds'])
+            && request.resource.data.memberIds.toSet().difference(resource.data.memberIds.toSet()).hasOnly([request.auth.uid])
+            && resource.data.memberIds.toSet().difference(request.resource.data.memberIds.toSet()).size() == 0)
         || (isMember(pid) && changedOnly(['favoriteBy'])
             && request.resource.data.favoriteBy.toSet().difference(resource.data.favoriteBy.toSet()).hasOnly([request.auth.uid])
             && resource.data.favoriteBy.toSet().difference(request.resource.data.favoriteBy.toSet()).hasOnly([request.auth.uid]))
@@ -122,7 +146,10 @@ service cloud.firestore {
       }
       match /members/{uid} {
         allow read: if isMember(pid) || isAdmin();
-        allow create: if validRole() && (isPM(pid) || (canCreateProjects() && isCreatorBootstrap(uid)));
+        allow create: if validRole() && (
+          isPM(pid)
+          || (canCreateProjects() && isCreatorBootstrap(uid))
+          || (request.auth.uid == uid && invitedTo(pid) && myInvite().projects[pid] == request.resource.data.role));
         allow update: if validRole() && isPM(pid);
         allow delete: if isPM(pid);
       }

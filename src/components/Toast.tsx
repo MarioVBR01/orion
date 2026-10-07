@@ -82,7 +82,11 @@ export function errorMessage(e: unknown): string {
     'auth/invalid-email': 'Correo inválido.',
     'auth/configuration-not-found':
       'Authentication no está activado en Firebase. Actívalo en la consola: Authentication → Comenzar → Correo electrónico/contraseña.',
-    'auth/operation-not-allowed': 'El inicio de sesión con correo/contraseña está deshabilitado en Firebase.',
+    'auth/operation-not-allowed': 'El proveedor de Google no está habilitado en Firebase Authentication.',
+    'auth/popup-closed-by-user': 'Cerraste la ventana de Google antes de terminar.',
+    'auth/cancelled-popup-request': 'Inicio de sesión cancelado.',
+    'auth/popup-blocked': 'El navegador bloqueó la ventana emergente. Permite pop-ups para este sitio.',
+    'auth/unauthorized-domain': 'Este dominio no está autorizado en Firebase Authentication.',
     unavailable: 'Sin conexión con el servidor.',
   }
   if (map[code]) return map[code]

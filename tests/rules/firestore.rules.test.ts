@@ -6,7 +6,7 @@ import {
   initializeTestEnvironment,
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing'
-import { doc, getDoc, setDoc, updateDoc, writeBatch, collection, getDocs, query, where } from 'firebase/firestore'
+import { arrayUnion, doc, getDoc, setDoc, updateDoc, writeBatch, collection, getDocs, query, where } from 'firebase/firestore'
 
 let env: RulesTestEnvironment
 
@@ -74,9 +74,38 @@ describe('usuarios', () => {
     await assertFails(getDoc(doc(db(users.inactive), 'projects', PID)))
   })
 
-  it('un PM no puede crear admins, pero sí testers', async () => {
-    await assertFails(setDoc(doc(db(users.pm), 'users', 'nuevo'), { name: 'x', email: 'x', globalRole: 'admin', active: true }))
-    await assertSucceeds(setDoc(doc(db(users.pm), 'users', 'nuevo'), { name: 'x', email: 'x', globalRole: 'tester', active: true }))
+  it('un PM no puede invitar admins, pero sí testers', async () => {
+    const inv = (email: string, globalRole: string) => ({ email, name: '', globalRole, projects: {}, createdBy: 'pm' })
+    await assertFails(setDoc(doc(db(users.pm), 'invites', 'a@x.com'), inv('a@x.com', 'admin')))
+    await assertSucceeds(setDoc(doc(db(users.pm), 'invites', 't@x.com'), inv('t@x.com', 'tester')))
+    await assertFails(setDoc(doc(db(users.dev), 'invites', 'z@x.com'), inv('z@x.com', 'tester')))
+  })
+
+  it('un invitado reclama su invitación con el rol indicado y se une al proyecto', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'invites', 'nuevo@gmail.com'), {
+        email: 'nuevo@gmail.com', name: 'Nuevo', globalRole: 'qa', projects: { [PID]: 'qa' }, createdBy: 'pm',
+      })
+    })
+    const token = { email: 'Nuevo@gmail.com', email_verified: true }
+    const fs = env.authenticatedContext('nuevo', token).firestore()
+
+    // no puede subirse el rol
+    await assertFails(setDoc(doc(fs, 'users', 'nuevo'), { name: 'N', email: 'nuevo@gmail.com', globalRole: 'admin', active: true }))
+    // ni unirse con otro rol al proyecto
+    await assertFails(setDoc(doc(fs, 'projects', PID, 'members', 'nuevo'), { role: 'project_manager' }))
+
+    const b = writeBatch(fs)
+    b.set(doc(fs, 'users', 'nuevo'), { name: 'N', email: 'nuevo@gmail.com', globalRole: 'qa', active: true })
+    b.set(doc(fs, 'projects', PID, 'members', 'nuevo'), { role: 'qa' })
+    b.update(doc(fs, 'projects', PID), { memberIds: arrayUnion('nuevo') })
+    b.delete(doc(fs, 'invites', 'nuevo@gmail.com'))
+    await assertSucceeds(b.commit())
+  })
+
+  it('sin invitación no se puede crear perfil', async () => {
+    const fs = env.authenticatedContext('x', { email: 'x@gmail.com', email_verified: true }).firestore()
+    await assertFails(setDoc(doc(fs, 'users', 'x'), { name: 'x', email: 'x@gmail.com', globalRole: 'dev', active: true }))
   })
 
   it('un usuario solo puede cambiar su propio nombre', async () => {

@@ -18,3 +18,10 @@ Registro de decisiones tomadas cuando el spec era ambiguo o había que ajustarlo
 12. **Rol efectivo.** El `admin` global tiene todos los permisos en todos los proyectos. El resto de los permisos depende del rol en el proyecto (`members/{uid}.role`), no del rol global.
 13. **Contadores por columna** en la pantalla Proyectos con agregaciones `count()` de Firestore. No se descargan las tarjetas.
 14. **Orden de tarjetas.** Fractional indexing con claves string base-62 (`src/lib/order.ts`).
+
+## Cambio: login con Google (pedido del usuario)
+
+15. **Proyecto Firebase:** `orion-66851` (creado por el usuario) reemplaza a `orion-pm-dev` como entorno `dev`.
+16. **Autenticación solo con Google** (`signInWithPopup`). Se eliminan la contraseña, "Cambiar contraseña" y la recuperación de contraseña, porque Google las gestiona.
+17. **Alta por invitación:** el admin o PM crea `invites/{correo}` con rol global y proyectos (`{ pid: rol }`). En el primer ingreso con Google el cliente "reclama" la invitación en un batch: crea `users/{uid}`, `members/{uid}`, se agrega a `memberIds` y borra la invitación. Las reglas exigen `email_verified`, que el correo del token coincida y que el rol sea exactamente el de la invitación.
+18. **Invitar desde Miembros** a un correo sin cuenta crea o amplía su invitación con ese proyecto. Si es un rol de proyecto `viewer`, el rol global es `cliente`.

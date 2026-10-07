@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import { onAuthStateChanged, signOut, type User } from 'firebase/auth'
 import { doc, onSnapshot } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase'
+import { claimInvite } from '@/lib/users'
 import type { AppUser } from '@/types'
 
 interface AuthState {
@@ -27,9 +28,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return
     }
     setProfile(undefined)
+    let triedClaim = false
     return onSnapshot(
       doc(db, 'users', firebaseUser.uid),
-      (snap) => setProfile(snap.exists() ? ({ id: snap.id, ...snap.data() } as AppUser) : null),
+      (snap) => {
+        if (snap.exists()) {
+          setProfile({ id: snap.id, ...snap.data() } as AppUser)
+          return
+        }
+        if (snap.metadata.fromCache) return
+        if (triedClaim) {
+          setProfile(null)
+          return
+        }
+        // Primer ingreso: si tiene invitación, la reclama (el snapshot se vuelve a disparar).
+        triedClaim = true
+        claimInvite(firebaseUser)
+          .then((claimed) => !claimed && setProfile(null))
+          .catch(() => setProfile(null))
+      },
       () => setProfile(null),
     )
   }, [firebaseUser])

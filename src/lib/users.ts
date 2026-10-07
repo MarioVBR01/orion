@@ -1,45 +1,88 @@
-import { deleteApp, initializeApp } from 'firebase/app'
-import { connectAuthEmulator, createUserWithEmailAndPassword, getAuth, signOut } from 'firebase/auth'
-import { doc, serverTimestamp, setDoc, updateDoc, writeBatch } from 'firebase/firestore'
-import { db, firebaseConfig, useEmulators } from './firebase'
+import { GoogleAuthProvider, signInWithPopup, type User } from 'firebase/auth'
+import {
+  arrayUnion,
+  deleteDoc,
+  doc,
+  getDoc,
+  serverTimestamp,
+  setDoc,
+  updateDoc,
+  writeBatch,
+} from 'firebase/firestore'
+import { auth, db } from './firebase'
 import type { GlobalRole, ProjectRole } from '@/types'
 
-/**
- * Crea una cuenta de Auth sin cerrar la sesión actual (usa una app secundaria)
- * y luego escribe users/{uid} con la sesión del admin/PM (validado por las reglas).
- */
-export async function createAppUser(input: {
-  name: string
+export interface Invite {
+  id: string // email en minúsculas
   email: string
-  password: string
+  name: string
   globalRole: GlobalRole
-  projects?: Array<{ projectId: string; role: ProjectRole; memberIds: string[] }>
-}): Promise<string> {
-  const secondary = initializeApp(firebaseConfig, `secondary-${Date.now()}`)
-  try {
-    const secAuth = getAuth(secondary)
-    if (useEmulators) connectAuthEmulator(secAuth, 'http://127.0.0.1:9099', { disableWarnings: true })
-    const cred = await createUserWithEmailAndPassword(secAuth, input.email.trim(), input.password)
-    const uid = cred.user.uid
-    await signOut(secAuth)
+  projects: Record<string, ProjectRole>
+  createdBy: string
+}
 
-    const batch = writeBatch(db)
-    batch.set(doc(db, 'users', uid), {
-      name: input.name.trim(),
-      email: input.email.trim().toLowerCase(),
-      globalRole: input.globalRole,
-      active: true,
-      createdAt: serverTimestamp(),
-    })
-    for (const p of input.projects ?? []) {
-      batch.set(doc(db, 'projects', p.projectId, 'members', uid), { role: p.role, addedAt: serverTimestamp() })
-      batch.update(doc(db, 'projects', p.projectId), { memberIds: [...new Set([...p.memberIds, uid])] })
-    }
-    await batch.commit()
-    return uid
-  } finally {
-    await deleteApp(secondary)
+export function normalizeEmail(email: string) {
+  return email.trim().toLowerCase()
+}
+
+export async function signInWithGoogle() {
+  const provider = new GoogleAuthProvider()
+  provider.setCustomParameters({ prompt: 'select_account' })
+  return signInWithPopup(auth, provider)
+}
+
+/** Crea o amplía una invitación (merge de proyectos). */
+export async function upsertInvite(input: {
+  email: string
+  name?: string
+  globalRole: GlobalRole
+  projects?: Record<string, ProjectRole>
+  createdBy: string
+}) {
+  const email = normalizeEmail(input.email)
+  const ref = doc(db, 'invites', email)
+  const prev = await getDoc(ref)
+  const prevData = prev.exists() ? (prev.data() as Omit<Invite, 'id'>) : null
+  await setDoc(ref, {
+    email,
+    name: input.name?.trim() || prevData?.name || '',
+    globalRole: prevData?.globalRole ?? input.globalRole,
+    projects: { ...(prevData?.projects ?? {}), ...(input.projects ?? {}) },
+    createdBy: input.createdBy,
+    createdAt: serverTimestamp(),
+  })
+}
+
+export function deleteInvite(email: string) {
+  return deleteDoc(doc(db, 'invites', normalizeEmail(email)))
+}
+
+/**
+ * Si el usuario de Google tiene invitación, crea su perfil, lo agrega a los
+ * proyectos invitados y borra la invitación. Devuelve true si la reclamó.
+ */
+export async function claimInvite(user: User): Promise<boolean> {
+  if (!user.email) return false
+  const ref = doc(db, 'invites', normalizeEmail(user.email))
+  const snap = await getDoc(ref)
+  if (!snap.exists()) return false
+  const inv = snap.data() as Omit<Invite, 'id'>
+  const batch = writeBatch(db)
+  batch.set(doc(db, 'users', user.uid), {
+    name: inv.name || user.displayName || inv.email,
+    email: inv.email,
+    photoURL: user.photoURL ?? null,
+    globalRole: inv.globalRole,
+    active: true,
+    createdAt: serverTimestamp(),
+  })
+  for (const [pid, role] of Object.entries(inv.projects ?? {})) {
+    batch.set(doc(db, 'projects', pid, 'members', user.uid), { role, addedAt: serverTimestamp() })
+    batch.update(doc(db, 'projects', pid), { memberIds: arrayUnion(user.uid) })
   }
+  batch.delete(ref)
+  await batch.commit()
+  return true
 }
 
 export function setUserActive(uid: string, active: boolean) {
@@ -51,19 +94,16 @@ export function setUserRole(uid: string, globalRole: GlobalRole) {
 }
 
 /** Primer admin del sistema (pantalla /setup). */
-export async function bootstrapAdmin(uid: string, name: string, email: string) {
+export async function bootstrapAdmin(user: User) {
   const batch = writeBatch(db)
-  batch.set(doc(db, 'users', uid), {
-    name: name.trim(),
-    email: email.trim().toLowerCase(),
+  batch.set(doc(db, 'users', user.uid), {
+    name: user.displayName || user.email || 'Admin',
+    email: normalizeEmail(user.email ?? ''),
+    photoURL: user.photoURL ?? null,
     globalRole: 'admin',
     active: true,
     createdAt: serverTimestamp(),
   })
-  batch.set(doc(db, 'meta', 'bootstrap'), { uid, at: serverTimestamp() })
+  batch.set(doc(db, 'meta', 'bootstrap'), { uid: user.uid, at: serverTimestamp() })
   await batch.commit()
-}
-
-export function updateMyName(uid: string, name: string) {
-  return setDoc(doc(db, 'users', uid), { name: name.trim() }, { merge: true })
 }
