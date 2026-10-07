@@ -12,6 +12,13 @@ import type {
   Project,
   ProjectInput,
   Settings,
+  Attachment,
+  Channel,
+  Observation,
+  ObservationComment,
+  ObservationInput,
+  ObservationStatus,
+  ToBacklogInput,
 } from '@shared/types'
 
 export class ApiError extends Error {
@@ -194,6 +201,97 @@ export function useCardMutations(pid: number) {
     comment: useMutation({
       mutationFn: ({ number, text }: { number: number; text: string }) =>
         api<Comment>(`/projects/${pid}/cards/${number}/comments`, { method: 'POST', body: { text } }),
+      onSettled: refresh,
+    }),
+  }
+}
+
+// ---------- Adjuntos ----------
+export async function uploadFile(pid: number, file: File): Promise<Attachment> {
+  let res: Response
+  try {
+    res = await fetch(`/api/projects/${pid}/uploads`, {
+      method: 'POST',
+      headers: { 'Content-Type': file.type || 'application/octet-stream', 'X-Filename': encodeURIComponent(file.name || 'captura.png') },
+      body: file,
+    })
+  } catch {
+    throw new ApiError('No hay conexión con el servidor local.', 0)
+  }
+  const data: unknown = await res.json().catch(() => ({}))
+  if (!res.ok) throw new ApiError(typeof data === 'object' && data && 'error' in data ? String(data.error) : res.statusText, res.status)
+  return data as Attachment
+}
+
+// ---------- Observaciones ----------
+export type ObservationFilter = ObservationStatus | 'abiertas' | 'todas'
+
+export const obsKeys = {
+  all: (pid: number) => ['projects', pid, 'observations'] as const,
+  list: (pid: number, channel: Channel, status: ObservationFilter) => ['projects', pid, 'observations', channel, status] as const,
+  counts: (pid: number) => ['projects', pid, 'observations', 'counts'] as const,
+  one: (pid: number, n: number) => ['projects', pid, 'observations', 'one', n] as const,
+  comments: (pid: number, n: number) => ['projects', pid, 'observations', 'one', n, 'comments'] as const,
+}
+
+export function useObservations(pid: number, channel: Channel, status: ObservationFilter) {
+  const q = new URLSearchParams({ channel })
+  if (status !== 'todas') q.set('status', status)
+  return useQuery({ queryKey: obsKeys.list(pid, channel, status), queryFn: () => api<Observation[]>(`/projects/${pid}/observations?${q}`) })
+}
+export function useObservationCounts(pid: number) {
+  return useQuery({ queryKey: obsKeys.counts(pid), queryFn: () => api<Record<Channel, number>>(`/projects/${pid}/observations/counts`) })
+}
+export function useObservation(pid: number, n: number, initial?: Observation) {
+  return useQuery({
+    queryKey: obsKeys.one(pid, n),
+    queryFn: () => api<Observation>(`/projects/${pid}/observations/${n}`),
+    placeholderData: initial,
+  })
+}
+export function useObservationComments(pid: number, n: number) {
+  return useQuery({ queryKey: obsKeys.comments(pid, n), queryFn: () => api<ObservationComment[]>(`/projects/${pid}/observations/${n}/comments`) })
+}
+
+export function useObservationMutations(pid: number) {
+  const qc = useQueryClient()
+  const refresh = () => {
+    void qc.invalidateQueries({ queryKey: obsKeys.all(pid) })
+    void qc.invalidateQueries({ queryKey: cardKeys.all(pid) })
+    void qc.invalidateQueries({ queryKey: keys.project(pid), exact: true })
+    void qc.invalidateQueries({ queryKey: keys.projects, exact: true })
+  }
+  const base = `/projects/${pid}/observations`
+  return {
+    create: useMutation({
+      mutationFn: (input: ObservationInput) => api<Observation>(base, { method: 'POST', body: input }),
+      onSettled: refresh,
+    }),
+    update: useMutation({
+      mutationFn: ({ number, ...patch }: { number: number } & Partial<ObservationInput>) =>
+        api<Observation>(`${base}/${number}`, { method: 'PATCH', body: patch }),
+      onSettled: refresh,
+    }),
+    toBacklog: useMutation({
+      mutationFn: (input: ToBacklogInput) => api<Card[]>(`${base}/to-backlog`, { method: 'POST', body: input }),
+      onSettled: refresh,
+    }),
+    reject: useMutation({
+      mutationFn: (input: { numbers: number[]; reason: string }) => api<Observation[]>(`${base}/reject`, { method: 'POST', body: input }),
+      onSettled: refresh,
+    }),
+    requestInfo: useMutation({
+      mutationFn: ({ number, question }: { number: number; question: string }) =>
+        api<Observation>(`${base}/${number}/request-info`, { method: 'POST', body: { question } }),
+      onSettled: refresh,
+    }),
+    reopen: useMutation({
+      mutationFn: (number: number) => api<Observation>(`${base}/${number}/reopen`, { method: 'POST' }),
+      onSettled: refresh,
+    }),
+    comment: useMutation({
+      mutationFn: ({ number, text }: { number: number; text: string }) =>
+        api<ObservationComment>(`${base}/${number}/comments`, { method: 'POST', body: { text } }),
       onSettled: refresh,
     }),
   }

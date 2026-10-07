@@ -88,6 +88,36 @@ const MIGRATIONS: string[] = [
   CREATE INDEX history_card ON history (card_id, id);
   CREATE INDEX history_project ON history (project_id, id);
   `,
+  /* 3: observaciones (Por revisar) */ `
+  ALTER TABLE projects ADD COLUMN observation_counter INTEGER NOT NULL DEFAULT 0;
+
+  CREATE TABLE observations (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id  INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    number      INTEGER NOT NULL,
+    channel     TEXT NOT NULL,
+    kind        TEXT NOT NULL,
+    title       TEXT NOT NULL,
+    report      TEXT NOT NULL,
+    attachments TEXT NOT NULL DEFAULT '[]',
+    sender      TEXT NOT NULL,
+    status      TEXT NOT NULL DEFAULT 'pendiente',
+    status_note TEXT,
+    card_number INTEGER,
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL,
+    UNIQUE (project_id, number)
+  );
+  CREATE INDEX observations_inbox ON observations (project_id, channel, status, created_at);
+
+  CREATE TABLE observation_comments (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    observation_id INTEGER NOT NULL REFERENCES observations(id) ON DELETE CASCADE,
+    author         TEXT NOT NULL,
+    text           TEXT NOT NULL,
+    created_at     TEXT NOT NULL
+  );
+  `,
 ]
 
 export function openDb(file: string): Db {
@@ -109,9 +139,14 @@ function migrate(db: Db) {
   }
 }
 
-/** Ejecuta fn dentro de una transacción. */
+const depth = new WeakMap<Db, number>()
+
+/** Ejecuta fn dentro de una transacción. Reentrante: si ya hay una abierta, se suma a ella. */
 export function tx<T>(db: Db, fn: () => T): T {
+  const level = depth.get(db) ?? 0
+  if (level > 0) return fn()
   db.exec('BEGIN IMMEDIATE')
+  depth.set(db, 1)
   try {
     const result = fn()
     db.exec('COMMIT')
@@ -119,6 +154,8 @@ export function tx<T>(db: Db, fn: () => T): T {
   } catch (e) {
     db.exec('ROLLBACK')
     throw e
+  } finally {
+    depth.set(db, 0)
   }
 }
 

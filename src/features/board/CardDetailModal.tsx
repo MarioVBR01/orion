@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Archive, ChevronLeft, ChevronRight, GitBranch, GitCommit, GitPullRequest, Plus, Trash2, X } from 'lucide-react'
+import { Gallery } from '@/components/Attachments'
 import { Markdown } from '@/components/Markdown'
 import { ReportEditor, ReportView, emptyReport } from '@/components/ReportEditor'
 import { errorMessage, useToast } from '@/components/Toast'
@@ -117,13 +118,7 @@ function CardDetail({ card, onClose, onNavigate }: { card: Card; onClose: () => 
 
           {card.attachments.length > 0 && (
             <Section title="Adjuntos">
-              <ul className="flex flex-wrap gap-2">
-                {card.attachments.map((a) => (
-                  <li key={a.url}>
-                    <a href={a.url} target="_blank" rel="noreferrer" className="text-sm text-brand underline">{a.name}</a>
-                  </li>
-                ))}
-              </ul>
+              <Gallery attachments={card.attachments} />
             </Section>
           )}
 

@@ -185,3 +185,63 @@ export interface HistoryEntry {
   detail: string | null
   at: string
 }
+
+// ---------- Observaciones (Por revisar) ----------
+
+export type Channel = 'clientes' | 'testers'
+export type ObservationKind = 'bug' | 'mejora' | 'duda'
+/** pendiente → (info ↔ pendiente) → en_backlog | rechazada */
+export type ObservationStatus = 'pendiente' | 'info' | 'en_backlog' | 'rechazada'
+
+export const CHANNELS: Channel[] = ['clientes', 'testers']
+export const OBSERVATION_KINDS: ObservationKind[] = ['bug', 'mejora', 'duda']
+export const KIND_LABEL: Record<ObservationKind, string> = { bug: 'Bug', mejora: 'Mejora', duda: 'Duda' }
+export const KIND_EMOJI: Record<ObservationKind, string> = { bug: '🐞', mejora: '💡', duda: '❓' }
+export const STATUS_LABEL: Record<ObservationStatus, string> = {
+  pendiente: 'Pendiente',
+  info: 'Esperando información',
+  en_backlog: 'En Backlog',
+  rechazada: 'Rechazada',
+}
+/** Tipo de tarjeta que nace de cada tipo de observación. */
+export const KIND_TO_CARD_TYPE: Record<ObservationKind, CardType> = { bug: 'bug', mejora: 'historia', duda: 'tarea' }
+
+export interface Observation {
+  id: number
+  projectId: number
+  number: number
+  channel: Channel
+  kind: ObservationKind
+  title: string
+  report: Report
+  attachments: Attachment[]
+  sender: string
+  status: ObservationStatus
+  statusNote: string | null
+  cardNumber: number | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ObservationInput {
+  channel: Channel
+  kind: ObservationKind
+  title: string
+  report: Report
+  attachments?: Attachment[]
+  sender?: string
+}
+
+export interface ObservationComment {
+  id: number
+  observationId: number
+  author: string
+  text: string
+  createdAt: string
+}
+
+export interface ToBacklogInput {
+  numbers: number[]
+  priority?: Priority
+  labels?: string[]
+}

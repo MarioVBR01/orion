@@ -24,6 +24,7 @@
     "server",
     "shared",
     "tests",
-    "scripts"
+    "scripts",
+    "cli"
   ]
 }

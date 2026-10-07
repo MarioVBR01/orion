@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Link, NavLink } from 'react-router-dom'
-import { Bell, Menu, Settings as SettingsIcon, X } from 'lucide-react'
+import { Menu, Settings as SettingsIcon, X } from 'lucide-react'
 import { Logo, Modal } from '@/components/ui'
 import { errorMessage, useToast } from '@/components/Toast'
 import { useSettings, useUpdateSettings } from '@/lib/api'
@@ -10,12 +10,9 @@ export function TopBar() {
   const { data: settings } = useSettings()
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState(false)
-  // Las notificaciones llegan en la fase 6.
-  const unread = 0
 
   const links = [
     { to: '/proyectos', label: 'Proyectos', badge: 0 },
-    { to: '/mensajes', label: 'Mensajes', badge: unread },
   ]
 
   const navClass = ({ isActive }: { isActive: boolean }) =>
@@ -45,10 +42,6 @@ export function TopBar() {
         </nav>
 
         <div className="ml-auto hidden items-center gap-4 md:flex">
-          <Link to="/mensajes" aria-label="Notificaciones" className="relative text-gray-600 hover:text-gray-900">
-            <Bell className="h-5 w-5" />
-            {unread > 0 && <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-red-600" />}
-          </Link>
           <span className="text-[15px] text-gray-800">{settings?.userName ?? '…'}</span>
           <button className="btn-outline" onClick={() => setEditing(true)}>
             <SettingsIcon className="h-4 w-4" /> Ajustes

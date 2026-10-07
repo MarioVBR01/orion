@@ -30,3 +30,20 @@ El usuario decidió no usar Firebase: ORION será local y solo lo usará él. Fi
 19. **Con búsqueda activa**, el orden de una tarjeta arrastrada se calcula entre sus vecinas visibles.
 20. **Sprints:** el selector y el filtro por sprint quedan para la fase 6, junto con el burndown.
 21. **Adjuntos de tarjeta:** por ahora solo se muestran. La subida llega en la fase 3, con las observaciones.
+
+## Alcance actual (pedido del usuario)
+
+22. **Fuera de alcance por ahora:** login, Rounds, servidor MCP, Brief, Links y Mensajes. Se quitaron de las pestañas y del menú.
+23. **La IA trabaja con el comando `orion`** en lugar del servidor MCP. Claude Code lo ejecuta desde la terminal del repo del proyecto. Usa la misma lógica y las mismas reglas que el servidor (`server/cards.ts`), directamente sobre `data/orion.db`, así que no necesita que el servidor esté corriendo. Los cambios se ven en el tablero en 5 s o menos.
+24. **`orion siguiente`** toma la tarjeta de más arriba en *Por hacer* y, si no hay, la de más arriba en *Backlog* (el orden lo decide el usuario arrastrando). Salta las asignadas a otra persona. Al tomarla, la asigna a `claude` y la mueve a *En progreso*.
+25. **Vincular un repo:** `orion init <CÓDIGO>` crea `.orion.json` en el repo. Con `--claude-md` además agrega a su `CLAUDE.md` las instrucciones de trabajo (rama, criterios, `trabajo`, `terminar`). El proyecto también se puede elegir con `--proyecto` o con `ORION_PROYECTO`.
+26. **Adjuntos para la IA:** `orion ver` muestra la ruta en disco de cada imagen, para que Claude Code pueda abrirlas.
+
+## Fase 3: Por revisar
+
+27. **Sin Rounds:** una observación pasa **a mano** al Backlog con "Pasar al Backlog", de a una o en lote, y se convierte en tarjeta. El tipo se mapea así: bug → Bug, mejora → Historia, duda → Tarea. Al pasarla se eligen la prioridad y las etiquetas iniciales.
+28. **Estados de una observación:** pendiente → (esperando información ↔ pendiente, al editarla) → en Backlog | rechazada (con motivo; se puede reabrir). Las acciones en lote son atómicas.
+29. **La tarjeta conserva** el reporte, los adjuntos, el autor original ("Por Rodri BC") y la observación de origen. La descripción queda vacía para notas, para no repetir el reporte.
+30. **Remitente:** texto libre con sugerencias de los Miembros del proyecto, primero los del rol del canal. Si se deja vacío, se usa el nombre de Ajustes.
+31. **Adjuntos** en `data/uploads/<proyecto>/` (imágenes, PDF y video de hasta 15 MB), servidos en `/uploads`. Se suben al agregarlos: arrastrando, pegando con Ctrl+V o con el selector de archivos.
+32. **Contador de la pestaña:** suma las observaciones abiertas (pendientes y esperando información) de ambos canales.

@@ -1,21 +1,18 @@
 import { useState } from 'react'
 import { Link, NavLink, Navigate, Outlet, useLocation, useParams } from 'react-router-dom'
 import { ArrowLeft, Pencil, Star } from 'lucide-react'
-import { useProject, useUpdateProject } from '@/lib/api'
+import { useObservationCounts, useProject, useUpdateProject } from '@/lib/api'
 import { ProjectFormModal } from '@/features/projects/ProjectFormModal'
 import { EmptyState, Skeleton } from '@/components/ui'
 import { errorMessage, useToast } from '@/components/Toast'
 import { ProjectContext } from './ProjectContext'
 
 const TABS = [
-  { path: 'brief', label: 'Brief' },
   { path: 'tablero', label: 'Tablero' },
   { path: 'por-revisar', label: 'Por revisar' },
-  { path: 'rounds', label: 'Rounds' },
   { path: 'testing', label: 'Testing' },
   { path: 'versiones', label: 'Versiones' },
   { path: 'miembros', label: 'Miembros' },
-  { path: 'links', label: 'Links' },
 ]
 
 export function ProjectLayout() {
@@ -25,6 +22,8 @@ export function ProjectLayout() {
   const { data: project, isPending, isError } = useProject(pid)
   const update = useUpdateProject()
   const [editing, setEditing] = useState(false)
+  const { data: obsCounts } = useObservationCounts(pid)
+  const pending = (obsCounts?.clientes ?? 0) + (obsCounts?.testers ?? 0)
 
   if (isPending) {
     return (
@@ -77,6 +76,9 @@ export function ProjectLayout() {
             }
           >
             {t.label}
+            {t.path === 'por-revisar' && pending > 0 && (
+              <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-brand">{pending}</span>
+            )}
           </NavLink>
         ))}
       </nav>

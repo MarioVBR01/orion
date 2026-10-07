@@ -1,6 +1,7 @@
 import { moveError } from '../shared/flow'
 import { keyBetween } from '../shared/order'
 import type {
+  Attachment,
   BulkAction,
   Card,
   CardInput,
@@ -162,7 +163,16 @@ export function createCardsRepo(db: Db) {
       return toCard(row(projectId, number))
     },
 
-    create(projectId: number, input: CardInput, actor: string): Card {
+    /**
+     * Crea una tarjeta. `extra` lo usa la conversión de observaciones:
+     * conserva autor original, adjuntos y la observación de origen.
+     */
+    create(
+      projectId: number,
+      input: CardInput,
+      actor: string,
+      extra: { createdBy?: string; attachments?: Attachment[]; sourceObservationIds?: number[] } = {},
+    ): Card {
       ensureProject(projectId)
       return tx(db, () => {
         db.prepare('UPDATE projects SET card_counter = card_counter + 1 WHERE id = ?').run(projectId)
@@ -173,8 +183,8 @@ export function createCardsRepo(db: Db) {
         const at = now()
         db.prepare(
           `INSERT INTO cards (project_id, number, title, type, priority, column_id, ord, labels, assignee, description_md,
-             report, acceptance, created_by, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             report, acceptance, attachments, source_observation_ids, created_by, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         ).run(
           projectId,
           number,
@@ -188,7 +198,9 @@ export function createCardsRepo(db: Db) {
           input.descriptionMd ?? '',
           input.report ? JSON.stringify(input.report) : null,
           JSON.stringify(input.acceptance ?? []),
-          actor,
+          JSON.stringify(extra.attachments ?? []),
+          JSON.stringify(extra.sourceObservationIds ?? []),
+          extra.createdBy ?? actor,
           at,
           at,
         )

@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   DndContext,
   DragOverlay,
@@ -46,7 +47,21 @@ export function BoardTab() {
 
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<Set<number>>(new Set())
-  const [openNumber, setOpenNumber] = useState<number | null>(null)
+  const [params, setParams] = useSearchParams()
+  // ?tarjeta=N abre el detalle (enlaces desde Por revisar)
+  const openNumber = params.get('tarjeta') ? Number(params.get('tarjeta')) : null
+  const setOpenNumber = useCallback(
+    (n: number | null) =>
+      setParams(
+        (p) => {
+          if (n === null) p.delete('tarjeta')
+          else p.set('tarjeta', String(n))
+          return p
+        },
+        { replace: true },
+      ),
+    [setParams],
+  )
   const [panel, setPanel] = useState<null | 'new' | 'activity' | 'ideas' | 'archived'>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [pendingReturn, setPendingReturn] = useState<PendingMove | null>(null)
@@ -74,7 +89,7 @@ export function BoardTab() {
       return next
     })
   }, [])
-  const openCard = useCallback((n: number) => setOpenNumber(n), [])
+  const openCard = useCallback((n: number) => setOpenNumber(n), [setOpenNumber])
 
   // ---------- Drag & drop ----------
   const snapshot = (): Items => Object.fromEntries(COLUMN_IDS.map((c) => [c, groups[c].map((x) => x.number)])) as Items

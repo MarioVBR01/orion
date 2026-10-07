@@ -2,8 +2,24 @@ import express, { type NextFunction, type Request, type Response } from 'express
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { z, ZodError } from 'zod'
-import { CARD_TYPES, COLUMN_IDS, PERSON_ROLES, PRIORITIES, type CardType, type ColumnId, type PersonRole, type Priority } from '../shared/types'
+import {
+  CARD_TYPES,
+  CHANNELS,
+  COLUMN_IDS,
+  OBSERVATION_KINDS,
+  PERSON_ROLES,
+  PRIORITIES,
+  type CardType,
+  type Channel,
+  type ColumnId,
+  type ObservationKind,
+  type ObservationStatus,
+  type PersonRole,
+  type Priority,
+} from '../shared/types'
 import { createCardsRepo } from './cards'
+import { createObservationsRepo } from './observations'
+import { MAX_UPLOAD_BYTES, saveUpload } from './uploads'
 import { RuleError } from './errors'
 import type { Db } from './db'
 import { createRepo, NotFoundError } from './repo'
@@ -64,6 +80,31 @@ const bulkInput = z.object({
   ]),
 })
 const commentInput = z.object({ text: z.string().trim().min(1, 'El comentario está vacío').max(10000) })
+const attachment = z.object({
+  name: z.string().max(120),
+  url: z.string().regex(/^\/uploads\/\d+\/[\w.-]+$/, 'Adjunto inválido'),
+  type: z.string().max(80),
+  size: z.number().int().nonnegative(),
+})
+const observationInput = z.object({
+  channel: z.enum(CHANNELS as [Channel, ...Channel[]]),
+  kind: z.enum(OBSERVATION_KINDS as [ObservationKind, ...ObservationKind[]]),
+  title: z.string().trim().min(1, 'El título es obligatorio').max(300),
+  report: z.object({
+    where: z.string().trim().min(1, 'Completa ¿Dónde?').max(500),
+    steps: z.array(z.string().max(1000)).refine((s) => s.some((x) => x.trim()), 'Agrega al menos un paso en ¿Qué hice?'),
+    expected: z.string().trim().min(1, 'Completa ¿Qué esperaba?').max(5000),
+    actual: z.string().trim().min(1, 'Completa ¿Qué pasó?').max(5000),
+  }),
+  attachments: z.array(attachment).max(20).optional(),
+  sender: z.string().trim().max(80).optional(),
+})
+const numbersInput = z.array(z.number().int().positive()).min(1).max(200)
+const toBacklogInput = z.object({
+  numbers: numbersInput,
+  priority: z.enum(PRIORITIES as [Priority, ...Priority[]]).optional(),
+  labels: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
+})
 const settingsPatch = z.object({ userName: z.string().trim().min(1).max(60).optional() })
 
 const id = (v: unknown) => {
@@ -72,9 +113,10 @@ const id = (v: unknown) => {
   return n
 }
 
-export function createApp(db: Db, opts: { staticDir?: string } = {}) {
+export function createApp(db: Db, opts: { staticDir?: string; uploadsDir?: string } = {}) {
   const repo = createRepo(db)
   const cards = createCardsRepo(db)
+  const observations = createObservationsRepo(db)
   // Con un solo usuario local, el actor de la web es el nombre guardado en Ajustes.
   const actor = () => repo.getSettings().userName
   const app = express()
@@ -159,11 +201,61 @@ export function createApp(db: Db, opts: { staticDir?: string } = {}) {
     res.json(cards.activity(id(req.params.pid), Math.min(Number(req.query.limit ?? 100) || 100, 500)))
   })
 
+  // ---------- Adjuntos ----------
+  api.post('/projects/:pid/uploads', express.raw({ type: () => true, limit: MAX_UPLOAD_BYTES }), (req, res) => {
+    const pid = id(req.params.pid)
+    repo.getProject(pid)
+    if (!opts.uploadsDir) throw new RuleError('La subida de archivos no está configurada.')
+    const name = decodeURIComponent(String(req.header('x-filename') ?? 'archivo'))
+    const type = String(req.header('content-type') ?? '').split(';')[0]!.trim()
+    res.status(201).json(saveUpload(opts.uploadsDir, pid, name, type, Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0)))
+  })
+
+  // ---------- Observaciones (Por revisar) ----------
+  api.get('/projects/:pid/observations', (req, res) => {
+    const channel = CHANNELS.find((c) => c === req.query.channel)
+    const status = typeof req.query.status === 'string' ? (req.query.status as ObservationStatus | 'abiertas') : undefined
+    res.json(observations.list(id(req.params.pid), { channel, status }))
+  })
+  api.get('/projects/:pid/observations/counts', (req, res) => {
+    res.json(observations.pendingCounts(id(req.params.pid)))
+  })
+  api.post('/projects/:pid/observations', (req, res) => {
+    res.status(201).json(observations.create(id(req.params.pid), observationInput.parse(req.body), actor()))
+  })
+  api.post('/projects/:pid/observations/to-backlog', (req, res) => {
+    res.json(observations.toBacklog(id(req.params.pid), toBacklogInput.parse(req.body), actor()))
+  })
+  api.post('/projects/:pid/observations/reject', (req, res) => {
+    const body = z.object({ numbers: numbersInput, reason: z.string().trim().min(1, 'Indica el motivo del rechazo').max(2000) }).parse(req.body)
+    res.json(observations.reject(id(req.params.pid), body.numbers, body.reason, actor()))
+  })
+  api.get('/projects/:pid/observations/:n', (req, res) => {
+    res.json(observations.get(id(req.params.pid), id(req.params.n)))
+  })
+  api.patch('/projects/:pid/observations/:n', (req, res) => {
+    res.json(observations.update(id(req.params.pid), id(req.params.n), observationInput.partial().parse(req.body)))
+  })
+  api.post('/projects/:pid/observations/:n/request-info', (req, res) => {
+    const body = z.object({ question: z.string().trim().min(1, 'Escribe qué información falta').max(2000) }).parse(req.body)
+    res.json(observations.requestInfo(id(req.params.pid), id(req.params.n), body.question, actor()))
+  })
+  api.post('/projects/:pid/observations/:n/reopen', (req, res) => {
+    res.json(observations.reopen(id(req.params.pid), id(req.params.n), actor()))
+  })
+  api.get('/projects/:pid/observations/:n/comments', (req, res) => {
+    res.json(observations.comments(id(req.params.pid), id(req.params.n)))
+  })
+  api.post('/projects/:pid/observations/:n/comments', (req, res) => {
+    res.status(201).json(observations.comment(id(req.params.pid), id(req.params.n), commentInput.parse(req.body).text, actor()))
+  })
+
   api.use((_req, res) => {
     res.status(404).json({ error: 'Ruta no encontrada' })
   })
 
   app.use('/api', api)
+  if (opts.uploadsDir) app.use('/uploads', express.static(opts.uploadsDir, { maxAge: '7d', fallthrough: false }))
 
   // En producción local el mismo servidor sirve la web compilada (SPA).
   if (opts.staticDir && existsSync(opts.staticDir)) {
@@ -189,6 +281,12 @@ export function createApp(db: Db, opts: { staticDir?: string } = {}) {
     }
     if (err instanceof NotFoundError) {
       res.status(404).json({ error: err.message })
+      return
+    }
+    // Errores HTTP de Express/static (404 de un adjunto inexistente, 413 de archivo grande, etc.)
+    const status = typeof err === 'object' && err && 'status' in err ? Number((err as { status: unknown }).status) : 500
+    if (status >= 400 && status < 500) {
+      res.status(status).json({ error: status === 413 ? 'El archivo es demasiado grande.' : 'Solicitud inválida' })
       return
     }
     console.error(err)
