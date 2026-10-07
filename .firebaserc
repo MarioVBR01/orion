@@ -1,0 +1,7 @@
+{
+  "projects": {
+    "default": "orion-pm-dev",
+    "dev": "orion-pm-dev",
+    "prod": "orion-pm-prod"
+  }
+}
