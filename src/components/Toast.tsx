@@ -80,6 +80,9 @@ export function errorMessage(e: unknown): string {
     'auth/too-many-requests': 'Demasiados intentos. Intenta más tarde.',
     'auth/requires-recent-login': 'Vuelve a iniciar sesión para hacer este cambio.',
     'auth/invalid-email': 'Correo inválido.',
+    'auth/configuration-not-found':
+      'Authentication no está activado en Firebase. Actívalo en la consola: Authentication → Comenzar → Correo electrónico/contraseña.',
+    'auth/operation-not-allowed': 'El inicio de sesión con correo/contraseña está deshabilitado en Firebase.',
     unavailable: 'Sin conexión con el servidor.',
   }
   if (map[code]) return map[code]
