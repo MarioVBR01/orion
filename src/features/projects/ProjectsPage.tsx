@@ -1,60 +1,47 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { FolderKanban, Plus, Star } from 'lucide-react'
-import { useMe } from '@/features/auth/AuthProvider'
-import { useUsers } from '@/features/users/useUsers'
+import { useCreateProject, useProjects, useUpdateProject } from '@/lib/api'
 import { Avatar, EmptyState, ProgressBar, Skeleton } from '@/components/ui'
 import { errorMessage, useToast } from '@/components/Toast'
-import { can } from '@/lib/permissions'
 import { percent } from '@/lib/format'
-import { COLUMNS, type AppUser, type Project } from '@/types'
-import { createProject, toggleFavorite, useColumnCounts, useProjects } from './api'
+import { COLUMNS, type Project } from '@shared/types'
 import { ProjectFormModal } from './ProjectFormModal'
 
 export function ProjectsPage() {
-  const me = useMe()
   const toast = useToast()
   const navigate = useNavigate()
-  const { projects } = useProjects(me)
-  const { byId } = useUsers()
+  const { data: projects, isPending } = useProjects()
+  const create = useCreateProject()
   const [showNew, setShowNew] = useState(false)
 
-  const sorted = useMemo(() => {
-    const list = (projects ?? []).filter((p) => !p.archived)
-    return list.sort((a, b) => {
-      const fa = a.favoriteBy.includes(me.id) ? 0 : 1
-      const fb = b.favoriteBy.includes(me.id) ? 0 : 1
-      return fa - fb || a.number - b.number
-    })
-  }, [projects, me.id])
+  const newButton = (
+    <button className="btn-primary" onClick={() => setShowNew(true)}>
+      <Plus className="h-4 w-4" /> Nuevo proyecto
+    </button>
+  )
 
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">Proyectos</h1>
-        {can.createProjects(me) && (
-          <button className="btn-primary" onClick={() => setShowNew(true)}>
-            <Plus className="h-4 w-4" /> Nuevo proyecto
-          </button>
-        )}
+        {newButton}
       </div>
 
-      {projects === undefined ? (
+      {isPending ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[0, 1, 2].map((i) => <Skeleton key={i} className="h-48" />)}
         </div>
-      ) : sorted.length === 0 ? (
+      ) : !projects?.length ? (
         <EmptyState
           icon={<FolderKanban className="h-10 w-10" />}
           title="Aún no tienes proyectos"
-          text={can.createProjects(me) ? 'Crea el primero para empezar a organizar el trabajo.' : 'Pide a tu project manager que te agregue a un proyecto.'}
-          action={can.createProjects(me) && <button className="btn-primary" onClick={() => setShowNew(true)}><Plus className="h-4 w-4" /> Nuevo proyecto</button>}
+          text="Crea el primero (por ejemplo LaGuardiaGO) para empezar a organizar el trabajo."
+          action={newButton}
         />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {sorted.map((p) => (
-            <ProjectCard key={p.id} project={p} me={me} usersById={byId} />
-          ))}
+          {projects.map((p) => <ProjectCard key={p.id} project={p} />)}
         </div>
       )}
 
@@ -65,10 +52,10 @@ export function ProjectsPage() {
         submitLabel="Crear proyecto"
         onSubmit={async (v) => {
           try {
-            const id = await createProject(me, v)
+            const p = await create.mutateAsync(v)
             toast.success('Proyecto creado.')
             setShowNew(false)
-            navigate(`/proyectos/${id}/tablero`)
+            navigate(`/proyectos/${p.id}/tablero`)
           } catch (e) {
             toast.error(errorMessage(e))
           }
@@ -78,12 +65,11 @@ export function ProjectsPage() {
   )
 }
 
-function ProjectCard({ project, me, usersById }: { project: Project; me: AppUser; usersById: Map<string, AppUser> }) {
+function ProjectCard({ project }: { project: Project }) {
   const toast = useToast()
-  const counts = useColumnCounts(project.id, true)
-  const isFav = project.favoriteBy.includes(me.id)
-  const total = counts ? Object.values(counts).reduce((a, b) => a + b, 0) : 0
-  const done = counts?.hecho ?? 0
+  const update = useUpdateProject()
+  const total = Object.values(project.counts).reduce((a, b) => a + b, 0)
+  const done = project.counts.hecho
   const pct = percent(done, total)
 
   return (
@@ -93,17 +79,17 @@ function ProjectCard({ project, me, usersById }: { project: Project; me: AppUser
         <div className="flex items-start gap-2">
           <Link to={`/proyectos/${project.id}/tablero`} className="min-w-0 flex-1 after:absolute after:inset-0">
             <h2 className="truncate text-lg font-bold">
-              {project.name} <span className="text-sm font-normal text-gray-400">#{project.number}</span>
+              {project.name} <span className="text-sm font-normal text-gray-400">#{project.id}</span>
             </h2>
             <p className="text-xs font-medium text-gray-500">{project.code}</p>
           </Link>
           <button
             className="relative z-10 rounded p-1 hover:bg-gray-100"
-            aria-label={isFav ? 'Quitar de favoritos' : 'Marcar como favorito'}
-            aria-pressed={isFav}
-            onClick={() => toggleFavorite(project.id, me.id, isFav).catch((e) => toast.error(errorMessage(e)))}
+            aria-label={project.favorite ? 'Quitar de favoritos' : 'Marcar como favorito'}
+            aria-pressed={project.favorite}
+            onClick={() => update.mutate({ id: project.id, favorite: !project.favorite }, { onError: (e) => toast.error(errorMessage(e)) })}
           >
-            <Star className={`h-5 w-5 ${isFav ? 'fill-amber-400 text-amber-400' : 'text-gray-300'}`} />
+            <Star className={`h-5 w-5 ${project.favorite ? 'fill-amber-400 text-amber-400' : 'text-gray-300'}`} />
           </button>
         </div>
         {project.description && <p className="mt-2 line-clamp-2 text-sm text-gray-600">{project.description}</p>}
@@ -111,30 +97,26 @@ function ProjectCard({ project, me, usersById }: { project: Project; me: AppUser
         <div className="mt-4">
           <div className="mb-1 flex justify-between text-xs text-gray-500">
             <span>Progreso</span>
-            <span>{counts ? `${done} de ${total} · ${pct}%` : '—'}</span>
+            <span>{done} de {total} · {pct}%</span>
           </div>
           <ProgressBar value={pct} />
         </div>
 
-        {counts && (
-          <div className="mt-3 grid grid-cols-3 gap-1.5 text-[11px] text-gray-600">
-            {COLUMNS.map((c) => (
-              <div key={c.id} className="flex items-center gap-1 truncate">
-                <span className={`h-2 w-2 shrink-0 rounded-full ${c.bar}`} />
-                <span className="truncate">{c.name}</span>
-                <span className="ml-auto font-semibold">{counts[c.id]}</span>
-              </div>
-            ))}
-          </div>
-        )}
+        <div className="mt-3 grid grid-cols-2 gap-1.5 text-[11px] text-gray-600 sm:grid-cols-3">
+          {COLUMNS.map((c) => (
+            <div key={c.id} className="flex items-center gap-1 truncate">
+              <span className={`h-2 w-2 shrink-0 rounded-full ${c.bar}`} />
+              <span className="truncate">{c.name}</span>
+              <span className="ml-auto font-semibold">{project.counts[c.id]}</span>
+            </div>
+          ))}
+        </div>
 
         <div className="mt-auto flex -space-x-2 pt-4">
-          {project.memberIds.slice(0, 6).map((uid) => (
-            <Avatar key={uid} name={usersById.get(uid)?.name ?? '?'} />
-          ))}
-          {project.memberIds.length > 6 && (
+          {project.people.slice(0, 6).map((p) => <Avatar key={p.id} name={p.name} />)}
+          {project.people.length > 6 && (
             <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-gray-200 text-xs text-gray-600 ring-2 ring-white">
-              +{project.memberIds.length - 6}
+              +{project.people.length - 6}
             </span>
           )}
         </div>

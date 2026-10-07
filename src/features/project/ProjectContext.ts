@@ -1,19 +1,10 @@
 import { createContext, useContext } from 'react'
-import type { EffectiveRole } from '@/lib/permissions'
-import type { AppUser, Project, ProjectRole } from '@/types'
+import type { Project } from '@shared/types'
 
-export interface ProjectCtx {
-  project: Project
-  me: AppUser
-  /** rol en el proyecto (o 'admin' global) */
-  role: EffectiveRole
-  memberRole: ProjectRole | null
-}
+export const ProjectContext = createContext<Project | null>(null)
 
-export const ProjectContext = createContext<ProjectCtx | null>(null)
-
-export function useProjectCtx(): ProjectCtx {
-  const ctx = useContext(ProjectContext)
-  if (!ctx) throw new Error('useProjectCtx fuera de ProjectLayout')
-  return ctx
+export function useCurrentProject(): Project {
+  const p = useContext(ProjectContext)
+  if (!p) throw new Error('useCurrentProject fuera de ProjectLayout')
+  return p
 }

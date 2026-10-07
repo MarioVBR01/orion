@@ -6,6 +6,19 @@ import { fileURLToPath, URL } from 'node:url'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
-  test: { include: ['tests/unit/**/*.test.ts'], environment: 'node' },
+  resolve: {
+    alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+      '@shared': fileURLToPath(new URL('./shared', import.meta.url)),
+    },
+  },
+  server: {
+    port: 5173,
+    proxy: { '/api': 'http://127.0.0.1:4321' },
+  },
+  test: {
+    include: ['tests/**/*.test.ts'],
+    environment: 'node',
+    execArgv: ['--experimental-sqlite', '--no-warnings'],
+  },
 })

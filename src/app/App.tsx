@@ -1,24 +1,20 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
-import { AuthProvider } from '@/features/auth/AuthProvider'
-import { LoginPage } from '@/features/auth/LoginPage'
-import { SetupPage } from '@/features/auth/SetupPage'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { ProjectsPage } from '@/features/projects/ProjectsPage'
 import { ComingSoon, ProjectLayout } from '@/features/project/ProjectLayout'
-import { MembersTab } from '@/features/project/MembersTab'
-import { UsersPage } from '@/features/users/UsersPage'
+import { PeopleTab } from '@/features/project/PeopleTab'
 import { ToastProvider } from '@/components/Toast'
 import { EmptyState } from '@/components/ui'
-import { ProtectedLayout } from './Layout'
+import { queryClient } from '@/lib/api'
+import { AppLayout } from './Layout'
 
 export function App() {
   return (
-    <ToastProvider>
-      <AuthProvider>
+    <QueryClientProvider client={queryClient}>
+      <ToastProvider>
         <BrowserRouter>
           <Routes>
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/setup" element={<SetupPage />} />
-            <Route element={<ProtectedLayout />}>
+            <Route element={<AppLayout />}>
               <Route index element={<Navigate to="/proyectos" replace />} />
               <Route path="/proyectos" element={<ProjectsPage />} />
               <Route path="/proyectos/:pid" element={<ProjectLayout />}>
@@ -28,17 +24,15 @@ export function App() {
                 <Route path="rounds" element={<ComingSoon title="Rounds" phase={4} />} />
                 <Route path="testing" element={<ComingSoon title="Testing" phase={6} />} />
                 <Route path="versiones" element={<ComingSoon title="Versiones" phase={6} />} />
-                <Route path="miembros" element={<MembersTab />} />
+                <Route path="miembros" element={<PeopleTab />} />
                 <Route path="links" element={<ComingSoon title="Links" phase={6} />} />
               </Route>
               <Route path="/mensajes" element={<ComingSoon title="Mensajes" phase={6} />} />
-              <Route path="/usuarios" element={<UsersPage />} />
-              <Route path="/testers" element={<ComingSoon title="Testers" phase={6} />} />
               <Route path="*" element={<EmptyState title="Página no encontrada" />} />
             </Route>
           </Routes>
         </BrowserRouter>
-      </AuthProvider>
-    </ToastProvider>
+      </ToastProvider>
+    </QueryClientProvider>
   )
 }

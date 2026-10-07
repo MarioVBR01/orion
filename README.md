@@ -1,36 +1,42 @@
 # ORION Manager
 
-Gestor de proyectos tipo Jira/Scrum, en español, sobre Firebase (Auth, Firestore, Storage, Hosting).
+Gestor de proyectos tipo Jira/Scrum, en español, **local y de un solo usuario**.
+Web en React, servidor Express y base SQLite en un archivo (`data/orion.db`).
 
 ## Requisitos
 
-- Node 20 o superior
-- Firebase CLI (`npm i -g firebase-tools`)
-- Java 11 o superior (para los emuladores)
+- Node 22.12 o superior (usa el módulo `node:sqlite` integrado; no requiere compilar nada)
 
-## Configuración
+## Uso
 
-1. Copia `.env.example` como `.env.development.local` (para `npm run dev`), `.env.dev.local` (para el deploy a dev) y `.env.prod.local` (para el deploy a prod). Rellena cada uno con la configuración web de su proyecto Firebase.
-2. En la consola de Firebase, activa **Authentication → Sign-in method → Google**.
-3. Abre `/setup` y entra con Google para ser el **primer administrador** (solo funciona una vez). Los demás usuarios entran por invitación (Usuarios → Invitar).
+```bash
+npm install
+npm start        # compila la web y abre el servidor en http://localhost:4321
+```
 
-## Scripts
+Tus datos quedan en `data/orion.db`. Para respaldarlos, copia la carpeta `data/`.
+
+## Desarrollo
 
 | Comando | Qué hace |
 | --- | --- |
-| `npm run dev` | Servidor de desarrollo |
+| `npm run dev` | API (puerto 4321) + Vite con recarga en caliente (http://localhost:5173) |
+| `npm run serve` | Solo el servidor, sirviendo la web ya compilada |
 | `npm run lint` | ESLint |
-| `npm run build` | Typecheck y build |
-| `npm test` | Pruebas unitarias (Vitest) |
-| `npm run test:rules` | Pruebas de las Security Rules con el emulador de Firestore |
-| `npm run deploy:dev` | Build y deploy a `orion-66851` |
-| `npm run deploy:prod` | Build y deploy a `orion-pm-prod` |
+| `npm run build` | Typecheck y build de la web |
+| `npm test` | Pruebas (Vitest): utilidades y API con SQLite en memoria |
+| `npm run check` | lint + build + test |
 
-## Entornos
+Variables opcionales: `PORT` (por defecto 4321) y `ORION_DB` (ruta de la base).
 
-| Alias | Proyecto | URL |
-| --- | --- | --- |
-| `dev` | `orion-66851` | https://orion-66851.web.app |
-| `prod` | `orion-pm-prod` | (pendiente) |
+## Estructura
+
+```
+server/   API Express + SQLite (db.ts: migraciones, repo.ts: lógica, app.ts: rutas)
+shared/   tipos compartidos entre web, servidor y MCP
+src/      web React (features/, components/, lib/)
+tests/    pruebas
+docs/     decisiones.md
+```
 
 Las decisiones de diseño están en [docs/decisiones.md](docs/decisiones.md).

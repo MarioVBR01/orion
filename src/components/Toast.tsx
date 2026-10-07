@@ -67,29 +67,8 @@ export function useToast(): ToastApi {
   return ctx
 }
 
-/** Traduce errores comunes de Firebase a español. */
+/** Mensaje legible para mostrar en un aviso. */
 export function errorMessage(e: unknown): string {
-  const code = typeof e === 'object' && e && 'code' in e ? String((e as { code: unknown }).code) : ''
-  const map: Record<string, string> = {
-    'permission-denied': 'No tienes permiso para esta acción.',
-    'auth/invalid-credential': 'Correo o contraseña incorrectos.',
-    'auth/wrong-password': 'Contraseña incorrecta.',
-    'auth/user-not-found': 'Usuario no encontrado.',
-    'auth/email-already-in-use': 'Ese correo ya está registrado.',
-    'auth/weak-password': 'La contraseña debe tener al menos 6 caracteres.',
-    'auth/too-many-requests': 'Demasiados intentos. Intenta más tarde.',
-    'auth/requires-recent-login': 'Vuelve a iniciar sesión para hacer este cambio.',
-    'auth/invalid-email': 'Correo inválido.',
-    'auth/configuration-not-found':
-      'Authentication no está activado en Firebase. Actívalo en la consola: Authentication → Comenzar → Correo electrónico/contraseña.',
-    'auth/operation-not-allowed': 'El proveedor de Google no está habilitado en Firebase Authentication.',
-    'auth/popup-closed-by-user': 'Cerraste la ventana de Google antes de terminar.',
-    'auth/cancelled-popup-request': 'Inicio de sesión cancelado.',
-    'auth/popup-blocked': 'El navegador bloqueó la ventana emergente. Permite pop-ups para este sitio.',
-    'auth/unauthorized-domain': 'Este dominio no está autorizado en Firebase Authentication.',
-    unavailable: 'Sin conexión con el servidor.',
-  }
-  if (map[code]) return map[code]
-  if (e instanceof Error) return e.message
+  if (e instanceof Error && e.message) return e.message
   return 'Ocurrió un error inesperado.'
 }

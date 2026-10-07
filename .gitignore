@@ -4,16 +4,10 @@ coverage
 *.log
 .env
 .env.*
-!.env.example
 *.local
-serviceAccount*.json
-*-service-account*.json
-.firebase/
-firebase-debug.log
-firestore-debug.log
-ui-debug.log
+# Base de datos local y adjuntos (tus datos, no código)
+data/
 test-results/
 playwright-report/
 mcp-server/dist
-functions/lib
 .DS_Store

@@ -1,7 +1,0 @@
-{
-  "projects": {
-    "default": "orion-66851",
-    "dev": "orion-66851",
-    "prod": "orion-pm-prod"
-  }
-}
