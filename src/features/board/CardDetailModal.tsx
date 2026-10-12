@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Archive, ChevronLeft, ChevronRight, GitBranch, GitCommit, GitPullRequest, Plus, Trash2, X } from 'lucide-react'
+import { Archive, FileDown, ChevronLeft, ChevronRight, GitBranch, GitCommit, GitPullRequest, Plus, Trash2, X } from 'lucide-react'
 import { Gallery } from '@/components/Attachments'
 import { Markdown } from '@/components/Markdown'
 import { ReportEditor, ReportView, emptyReport } from '@/components/ReportEditor'
@@ -27,6 +27,7 @@ import { PriorityDot, TypeBadge } from './badges'
 import { AssigneeSelect, LabelsInput } from './fields'
 import { describeHistory } from './historyText'
 import { ReturnCommentModal } from './ReturnCommentModal'
+import { ExportMdModal } from './ExportMdModal'
 
 const isTyping = (el: EventTarget | null) =>
   el instanceof HTMLElement && (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName))
@@ -66,6 +67,7 @@ function CardDetail({ card, onClose, onNavigate }: { card: Card; onClose: () => 
   const m = useCardMutations(project.id)
   const [title, setTitle] = useState(card.title)
   const [pendingReturn, setPendingReturn] = useState<ColumnId | null>(null)
+  const [exporting, setExporting] = useState(false)
 
   const save = (patch: CardPatch, ok?: string) =>
     m.update.mutate(
@@ -170,6 +172,13 @@ function CardDetail({ card, onClose, onNavigate }: { card: Card; onClose: () => 
             {card.sourceObservationIds.length > 0 && <p>Origen: observaciones {card.sourceObservationIds.map((id) => `#${id}`).join(', ')}</p>}
           </div>
 
+          <button className="btn-primary w-full" onClick={() => setExporting(true)}>
+            <FileDown className="h-4 w-4" /> Exportar .md para el chat
+          </button>
+          {card.exportedAt && (
+            <p className="-mt-3 text-center text-xs text-gray-500">Última exportación: {formatDateTime(new Date(card.exportedAt))}</p>
+          )}
+
           <button
             className="btn-outline w-full"
             onClick={() => {
@@ -185,6 +194,7 @@ function CardDetail({ card, onClose, onNavigate }: { card: Card; onClose: () => 
         </aside>
       </div>
 
+      {exporting && <ExportMdModal numbers={[card.number]} onClose={() => setExporting(false)} />}
       {pendingReturn && (
         <div data-nested-modal>
           <ReturnCommentModal

@@ -60,8 +60,8 @@ export function ToBacklogDialog({ count, onCancel, onConfirm }: { count: number;
         }
       >
         <p className="mb-4 text-sm text-gray-600">
-          {count === 1 ? 'Se creará una tarjeta' : `Se crearán ${count} tarjetas`} al final del Backlog con el reporte y las imágenes. Desde ahí la IA
-          puede tomarlas con <code className="rounded bg-gray-100 px-1">orion siguiente</code>.
+          {count === 1 ? 'Se creará una tarjeta' : `Se crearán ${count} tarjetas`} al final del Backlog con la descripción y las imágenes. Desde el
+          tablero podrás exportarlas a .md para el chat del proyecto.
         </p>
         <div className="space-y-4">
           <div>

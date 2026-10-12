@@ -118,6 +118,11 @@ const MIGRATIONS: string[] = [
     created_at     TEXT NOT NULL
   );
   `,
+  /* 4: reporte simple + exportación a .md para el chat de Claude */ `
+  ALTER TABLE observations ADD COLUMN description TEXT NOT NULL DEFAULT '';
+  ALTER TABLE projects ADD COLUMN ai_instructions TEXT NOT NULL DEFAULT '';
+  ALTER TABLE cards ADD COLUMN exported_at TEXT;
+  `,
 ]
 
 export function openDb(file: string): Db {

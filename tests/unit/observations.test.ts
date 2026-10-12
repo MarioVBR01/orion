@@ -10,9 +10,9 @@ import { attachmentPath } from '../../server/uploads'
 let app: ReturnType<typeof createApp>
 let uploadsDir: string
 
-const report = { where: 'Pantalla de carrera', steps: ['Abrir app', 'Pedir móvil'], expected: 'Ver botón QR al final', actual: 'Se ve desde el inicio' }
+const description = 'Cuando la carrera está finalizada debe aparecer el botón de pago QR; no debe verse al inicio.'
 const newObs = (extra: Record<string, unknown> = {}) =>
-  request(app).post('/api/projects/1/observations').send({ channel: 'clientes', kind: 'bug', title: 'APP-FLUJO CARRERA-QR', report, ...extra })
+  request(app).post('/api/projects/1/observations').send({ channel: 'clientes', kind: 'bug', title: 'APP-FLUJO CARRERA-QR', description, ...extra })
 
 beforeEach(async () => {
   uploadsDir = mkdtempSync(join(tmpdir(), 'orion-up-'))
@@ -35,12 +35,11 @@ describe('observaciones', () => {
     expect(list.body.map((o: { number: number }) => o.number)).toEqual([2])
   })
 
-  it('exige los bloques del reporte', async () => {
-    const r = await newObs({ report: { ...report, steps: ['  '] } })
+  it('exige título y descripción', async () => {
+    const r = await newObs({ description: '   ' })
     expect(r.status).toBe(400)
-    expect(r.body.error).toMatch(/paso/)
-    const r2 = await newObs({ report: { ...report, where: '' } })
-    expect(r2.body.error).toMatch(/Dónde/)
+    expect(r.body.error).toMatch(/Describe/)
+    expect((await newObs({ title: '' })).status).toBe(400)
   })
 
   it('al pasar al Backlog se convierte en tarjeta con el reporte, autor y adjuntos', async () => {
@@ -59,9 +58,9 @@ describe('observaciones', () => {
     expect(res.body).toHaveLength(2)
     const [c1, c2] = res.body
     expect(c1).toMatchObject({ number: 1, column: 'backlog', type: 'bug', priority: 'alta', createdBy: 'Rodri BC', labels: ['App pasajero'], sourceObservationIds: [1] })
-    expect(c1.report.where).toBe('Pantalla de carrera')
+    expect(c1.report).toBeNull()
+    expect(c1.descriptionMd).toBe(description)
     expect(c1.attachments[0].url).toBe(up.body.url)
-    expect(c1.report.actual).toBe('Se ve desde el inicio')
     expect(c1.attachments[0].name).toBe('captura m_vil.png')
     expect(c2.type).toBe('historia')
 

@@ -92,7 +92,7 @@ export function ProjectLayout() {
         onClose={() => setEditing(false)}
         title="Editar proyecto"
         submitLabel="Guardar"
-        initial={{ name: project.name, code: project.code, description: project.description, color: project.color }}
+        initial={{ name: project.name, code: project.code, description: project.description, color: project.color, aiInstructions: project.aiInstructions }}
         onSubmit={async (v) => {
           try {
             await update.mutateAsync({ id: project.id, ...v })

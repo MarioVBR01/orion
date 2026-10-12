@@ -19,7 +19,8 @@ import {
 } from '../shared/types'
 import { createCardsRepo } from './cards'
 import { createObservationsRepo } from './observations'
-import { MAX_UPLOAD_BYTES, saveUpload } from './uploads'
+import { attachmentPath, MAX_UPLOAD_BYTES, saveUpload } from './uploads'
+import { formatDateTime } from '../shared/format'
 import { RuleError } from './errors'
 import type { Db } from './db'
 import { createRepo, NotFoundError } from './repo'
@@ -29,6 +30,7 @@ const projectInput = z.object({
   code: z.string().trim().regex(/^[A-Za-z0-9]{2,6}$/, 'El prefijo debe tener de 2 a 6 letras o números'),
   description: z.string().max(2000).default(''),
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).default('#2563EB'),
+  aiInstructions: z.string().max(20000).optional(),
 })
 const projectPatch = projectInput.partial().extend({
   favorite: z.boolean().optional(),
@@ -90,12 +92,7 @@ const observationInput = z.object({
   channel: z.enum(CHANNELS as [Channel, ...Channel[]]),
   kind: z.enum(OBSERVATION_KINDS as [ObservationKind, ...ObservationKind[]]),
   title: z.string().trim().min(1, 'El título es obligatorio').max(300),
-  report: z.object({
-    where: z.string().trim().min(1, 'Completa ¿Dónde?').max(500),
-    steps: z.array(z.string().max(1000)).refine((s) => s.some((x) => x.trim()), 'Agrega al menos un paso en ¿Qué hice?'),
-    expected: z.string().trim().min(1, 'Completa ¿Qué esperaba?').max(5000),
-    actual: z.string().trim().min(1, 'Completa ¿Qué pasó?').max(5000),
-  }),
+  description: z.string().trim().min(1, 'Describe qué pasó o qué se necesita').max(20000),
   attachments: z.array(attachment).max(20).optional(),
   sender: z.string().trim().max(80).optional(),
 })
@@ -197,6 +194,21 @@ export function createApp(db: Db, opts: { staticDir?: string; uploadsDir?: strin
   api.get('/projects/:pid/cards/:n/history', (req, res) => {
     res.json(cards.history(id(req.params.pid), id(req.params.n)))
   })
+  // ---------- Exportar a .md (para el chat de Claude del proyecto) ----------
+  api.post('/projects/:pid/cards/export', (req, res) => {
+    const body = z
+      .object({ numbers: z.array(z.number().int().positive()).min(1).max(200), mark: z.boolean().optional(), moveTo: column.optional() })
+      .parse(req.body)
+    const at = new Date()
+    res.json(
+      cards.exportMarkdown(id(req.params.pid), body, actor(), {
+        attachmentPath: (url) => (opts.uploadsDir ? attachmentPath(opts.uploadsDir, url) : null),
+        date: formatDateTime(at),
+        isoDate: at.toISOString(),
+      }),
+    )
+  })
+
   api.get('/projects/:pid/activity', (req, res) => {
     res.json(cards.activity(id(req.params.pid), Math.min(Number(req.query.limit ?? 100) || 100, 500)))
   })

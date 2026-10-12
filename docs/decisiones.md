@@ -47,3 +47,20 @@ El usuario decidió no usar Firebase: ORION será local y solo lo usará él. Fi
 30. **Remitente:** texto libre con sugerencias de los Miembros del proyecto, primero los del rol del canal. Si se deja vacío, se usa el nombre de Ajustes.
 31. **Adjuntos** en `data/uploads/<proyecto>/` (imágenes, PDF y video de hasta 15 MB), servidos en `/uploads`. Se suben al agregarlos: arrastrando, pegando con Ctrl+V o con el selector de archivos.
 32. **Contador de la pestaña:** suma las observaciones abiertas (pendientes y esperando información) de ambos canales.
+
+## Cambio de enfoque: exportar .md en vez de automatizar (pedido del usuario)
+
+33. **Sin automatización con Claude por ahora.** El equipo todavía no está familiarizado con ese tipo de desarrollo. El comando `orion` se conserva en el código, pero en pausa y sin menciones en la interfaz.
+34. **Exportar a .md** (`shared/exportMd.ts`, ruta `POST /api/projects/:pid/cards/export`). Arma un mensaje para el chat de Claude del proyecto con:
+    1. Instrucciones del proyecto.
+    2. Cómo trabajar.
+    3. Tabla de **líneas de estado** (`▶ #N → En progreso`, `⏸ #N → Por hacer: …`, `✅ #N → En revisión QA`) con la columna a la que la persona mueve la tarjeta.
+    4. Bloque de cierre por tarea.
+    5. Tabla final (si hay varias tareas).
+    6. Detalle de cada tarjeta: descripción, reporte, criterios, rutas en disco de las imágenes y comentarios.
+35. **Las tarjetas salen en el orden del tablero** (columna y posición), sin importar el orden en que se seleccionaron.
+36. **La vista previa no tiene efectos.** Al *Copiar* o *Descargar* se registra la exportación: historial `exportada` con el nombre del archivo, `exported_at` y la marca `.md` en la tarjeta. Si se marca la opción, además pasan a *Por hacer*. Copiar y descargar en el mismo diálogo cuentan como una sola exportación.
+37. **Nombre del archivo:** `LGG-12.md` para una tarjeta y `LGG-tareas-AAAA-MM-DD.md` para varias.
+38. **Instrucciones para Claude por proyecto** (`projects.ai_instructions`): se editan en el modal del proyecto y encabezan cada .md. Si están vacías, la sección se omite y el diálogo de exportación avisa.
+39. **Por revisar simplificado** según la referencia: Título, Tipo (Bug: algo está roto, Mejora: algo podría funcionar mejor, Duda: no sé si es un error), Descripción y Screenshots (botón *Subir imágenes* o Ctrl+V). Se agrega un campo opcional *Reportado por* para no perder quién reporta. El reporte estructurado (¿Dónde?/¿Qué hice?…) queda solo para las observaciones antiguas y se sigue mostrando.
+40. **Al pasar al Backlog**, la descripción de la observación se vuelve la descripción de la tarjeta.

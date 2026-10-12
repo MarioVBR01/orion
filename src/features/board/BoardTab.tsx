@@ -14,7 +14,7 @@ import {
   type UniqueIdentifier,
 } from '@dnd-kit/core'
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
-import { History, Lightbulb, MoreVertical, Plus, RefreshCw, Search } from 'lucide-react'
+import { FileDown, History, Lightbulb, MoreVertical, Plus, RefreshCw, Search } from 'lucide-react'
 import { useCardMutations, useCards } from '@/lib/api'
 import { errorMessage, useToast } from '@/components/Toast'
 import { ProgressBar, Skeleton } from '@/components/ui'
@@ -31,6 +31,7 @@ import { ActivityDrawer } from './ActivityDrawer'
 import { IdeasDrawer } from './IdeasDrawer'
 import { ArchivedDrawer } from './ArchivedDrawer'
 import { ReturnCommentModal } from './ReturnCommentModal'
+import { ExportMdModal } from './ExportMdModal'
 
 type Items = Record<ColumnId, number[]>
 interface PendingMove {
@@ -63,6 +64,8 @@ export function BoardTab() {
     [setParams],
   )
   const [panel, setPanel] = useState<null | 'new' | 'activity' | 'ideas' | 'archived'>(null)
+  /** Tarjetas a exportar a .md (null = diálogo cerrado). */
+  const [exporting, setExporting] = useState<number[] | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [pendingReturn, setPendingReturn] = useState<PendingMove | null>(null)
   const [items, setItems] = useState<Items | null>(null)
@@ -162,6 +165,16 @@ export function BoardTab() {
     doMove({ number: n, column: col, order })
   }
 
+  /** Exporta todo el Backlog (en el orden del tablero, sin filtro de búsqueda). */
+  function exportBacklog() {
+    const backlog = groupByColumn(cards ?? []).backlog.map((c) => c.number)
+    if (!backlog.length) {
+      toast.error('El Backlog está vacío.')
+      return
+    }
+    setExporting(backlog)
+  }
+
   function doMove(p: PendingMove & { comment?: string }) {
     m.move.mutate(p, { onError: (e) => toast.error(errorMessage(e)) })
   }
@@ -202,6 +215,7 @@ export function BoardTab() {
                   onArchived={() => setPanel('archived')}
                   onSelectVisible={() => setSelected(new Set(visible.map((c) => c.number)))}
                   onExport={() => exportJson(project.code, cards ?? [])}
+                  onExportBacklog={() => exportBacklog()}
                 />
               )}
             </div>
@@ -239,6 +253,18 @@ export function BoardTab() {
                 selected={selected}
                 onToggleSelect={toggleSelect}
                 onOpen={openCard}
+                action={
+                  c.id === 'backlog' && columnCards('backlog').length > 0 ? (
+                    <button
+                      className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-brand"
+                      aria-label="Exportar Backlog a .md"
+                      title="Exportar Backlog a .md"
+                      onClick={exportBacklog}
+                    >
+                      <FileDown className="h-4 w-4" />
+                    </button>
+                  ) : undefined
+                }
               />
             ))}
           </div>
@@ -252,6 +278,7 @@ export function BoardTab() {
         <BulkBar
           count={selected.size}
           onClear={() => setSelected(new Set())}
+          onExport={() => setExporting([...selected])}
           onApply={(op) =>
             m.bulk.mutate(
               { numbers: [...selected], op },
@@ -282,6 +309,7 @@ export function BoardTab() {
       <ActivityDrawer open={panel === 'activity'} onClose={() => setPanel(null)} onOpenCard={(n) => { setPanel(null); setOpenNumber(n) }} />
       <IdeasDrawer open={panel === 'ideas'} onClose={() => setPanel(null)} cards={cards ?? []} onOpenCard={(n) => { setPanel(null); setOpenNumber(n) }} />
       <ArchivedDrawer open={panel === 'archived'} onClose={() => setPanel(null)} />
+      {exporting && <ExportMdModal numbers={exporting} onClose={() => setExporting(null)} onDone={() => setSelected(new Set())} />}
       {pendingReturn && (
         <ReturnCommentModal
           onCancel={() => setPendingReturn(null)}
@@ -295,7 +323,19 @@ export function BoardTab() {
   )
 }
 
-function BoardMenu({ onClose, onArchived, onSelectVisible, onExport }: { onClose: () => void; onArchived: () => void; onSelectVisible: () => void; onExport: () => void }) {
+function BoardMenu({
+  onClose,
+  onArchived,
+  onSelectVisible,
+  onExport,
+  onExportBacklog,
+}: {
+  onClose: () => void
+  onArchived: () => void
+  onSelectVisible: () => void
+  onExport: () => void
+  onExportBacklog: () => void
+}) {
   const item = 'block w-full px-4 py-2 text-left text-sm hover:bg-gray-50'
   const run = (fn: () => void) => () => {
     fn()
@@ -305,6 +345,7 @@ function BoardMenu({ onClose, onArchived, onSelectVisible, onExport }: { onClose
     <>
       <div className="fixed inset-0 z-30" onClick={onClose} />
       <div role="menu" className="absolute right-0 z-40 mt-2 w-56 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
+        <button role="menuitem" className={item} onClick={run(onExportBacklog)}>Exportar Backlog a .md</button>
         <button role="menuitem" className={item} onClick={run(onSelectVisible)}>Seleccionar tarjetas visibles</button>
         <button role="menuitem" className={item} onClick={run(onArchived)}>Ver archivadas</button>
         <button role="menuitem" className={item} onClick={run(onExport)}>Exportar tablero (JSON)</button>

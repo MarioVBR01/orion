@@ -8,7 +8,15 @@ export interface ProjectFormValues {
   code: string
   description: string
   color: string
+  aiInstructions: string
 }
+
+/** Ejemplo para el campo de instrucciones (se muestra como placeholder). */
+export const AI_INSTRUCTIONS_EXAMPLE = `- Repositorio: C:\\proyectos\\laguardiago-app (React Native + Expo)
+- Antes de cambiar algo, revisa cómo está hecho en el código existente y sigue el mismo estilo.
+- Crea una rama por tarea: fix/<número>-<resumen> (bugs) o feat/<número>-<resumen> (mejoras).
+- Verifica con: npm run lint && npm test
+- Responde en español.`
 
 export function ProjectFormModal({
   open,
@@ -25,7 +33,7 @@ export function ProjectFormModal({
   title: string
   submitLabel: string
 }) {
-  const empty: ProjectFormValues = { name: '', code: '', description: '', color: PROJECT_COLORS[0]! }
+  const empty: ProjectFormValues = { name: '', code: '', description: '', color: PROJECT_COLORS[0]!, aiInstructions: '' }
   const [values, setValues] = useState<ProjectFormValues>(initial ?? empty)
   const [busy, setBusy] = useState(false)
 
@@ -48,6 +56,7 @@ export function ProjectFormModal({
 
   return (
     <Modal
+      wide
       open={open}
       onClose={onClose}
       title={title}
@@ -82,6 +91,20 @@ export function ProjectFormModal({
         <div>
           <label className="label" htmlFor="p-desc">Descripción</label>
           <textarea id="p-desc" rows={3} className="input" value={values.description} onChange={(e) => set('description', e.target.value)} />
+        </div>
+        <div>
+          <label className="label" htmlFor="p-ai">Instrucciones para Claude</label>
+          <p className="-mt-0.5 mb-1.5 text-xs text-gray-500">
+            Van al inicio de cada .md que exportes: repositorio, stack, reglas de ramas, cómo verificar…
+          </p>
+          <textarea
+            id="p-ai"
+            rows={6}
+            className="input font-mono text-[13px]"
+            value={values.aiInstructions}
+            onChange={(e) => set('aiInstructions', e.target.value)}
+            placeholder={AI_INSTRUCTIONS_EXAMPLE}
+          />
         </div>
         <fieldset>
           <legend className="label">Color</legend>

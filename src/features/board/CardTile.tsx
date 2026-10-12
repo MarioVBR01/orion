@@ -2,6 +2,7 @@ import { memo, type CSSProperties } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { Card } from '@shared/types'
+import { formatDateTime } from '@/lib/format'
 import { AssigneeChip, LabelPill, PriorityDot, TypeBadge } from './badges'
 
 interface TileProps {
@@ -48,7 +49,17 @@ export const CardView = memo(function CardView({ card, selected, onToggleSelect,
       </button>
       <div className="mt-2 flex items-center gap-2">
         <span className="truncate text-xs text-gray-400">Por {card.createdBy}</span>
-        <span className="ml-auto"><AssigneeChip assignee={card.assignee} /></span>
+        <span className="ml-auto flex items-center gap-1">
+          {card.exportedAt && (
+            <span
+              title={`Exportada a .md el ${formatDateTime(new Date(card.exportedAt))}`}
+              className="rounded-full bg-sky-50 px-1.5 py-0.5 text-[10px] font-medium text-sky-700"
+            >
+              .md
+            </span>
+          )}
+          <AssigneeChip assignee={card.assignee} />
+        </span>
       </div>
     </div>
   )

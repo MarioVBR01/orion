@@ -21,6 +21,7 @@ interface ObsRow {
   channel: string
   kind: string
   title: string
+  description: string
   report: string
   attachments: string
   sender: string
@@ -38,7 +39,9 @@ const toObservation = (r: ObsRow): Observation => ({
   channel: r.channel as Channel,
   kind: r.kind as Observation['kind'],
   title: r.title,
-  report: JSON.parse(r.report) as Report,
+  description: r.description,
+  // las observaciones nuevas guardan 'null' en report (columna NOT NULL heredada)
+  report: JSON.parse(r.report) as Report | null,
   attachments: JSON.parse(r.attachments) as Attachment[],
   sender: r.sender,
   status: r.status as ObservationStatus,
@@ -135,15 +138,15 @@ export function createObservationsRepo(db: Db) {
           .get(projectId) as { observation_counter: number }
         const at = now()
         db.prepare(
-          `INSERT INTO observations (project_id, number, channel, kind, title, report, attachments, sender, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO observations (project_id, number, channel, kind, title, description, report, attachments, sender, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, 'null', ?, ?, ?, ?)`,
         ).run(
           projectId,
           number,
           input.channel,
           input.kind,
           input.title.trim(),
-          JSON.stringify({ ...input.report, steps: input.report.steps.map((s) => s.trim()).filter(Boolean) }),
+          input.description.trim(),
           JSON.stringify(input.attachments ?? []),
           input.sender?.trim() || actor,
           at,
@@ -160,13 +163,13 @@ export function createObservationsRepo(db: Db) {
         requireOpen(obs)
         const next = { ...toObservation(obs), ...patch }
         db.prepare(
-          `UPDATE observations SET channel = ?, kind = ?, title = ?, report = ?, attachments = ?, sender = ?,
+          `UPDATE observations SET channel = ?, kind = ?, title = ?, description = ?, attachments = ?, sender = ?,
              status = 'pendiente', updated_at = ? WHERE id = ?`,
         ).run(
           next.channel,
           next.kind,
           next.title.trim(),
-          JSON.stringify({ ...next.report, steps: next.report.steps.map((s) => s.trim()).filter(Boolean) }),
+          next.description.trim(),
           JSON.stringify(next.attachments),
           next.sender.trim(),
           now(),
@@ -192,8 +195,7 @@ export function createObservationsRepo(db: Db) {
               column: 'backlog',
               labels: input.labels ?? [],
               report: o.report,
-              // El reporte y los adjuntos van en sus propios campos; la descripción queda libre para notas.
-              descriptionMd: '',
+              descriptionMd: o.description,
             },
             actor,
             { createdBy: o.sender, attachments: o.attachments, sourceObservationIds: [o.number] },

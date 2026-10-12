@@ -1,11 +1,21 @@
 import { useState } from 'react'
-import { Archive, X } from 'lucide-react'
+import { Archive, FileDown, X } from 'lucide-react'
 import { usePeople } from '@/lib/api'
 import { useCurrentProject } from '@/features/project/ProjectContext'
 import { CLAUDE, COLUMNS, type BulkAction, type ColumnId } from '@shared/types'
 
 /** Barra flotante para acciones sobre las tarjetas seleccionadas. */
-export function BulkBar({ count, onClear, onApply }: { count: number; onClear: () => void; onApply: (op: BulkAction) => void }) {
+export function BulkBar({
+  count,
+  onClear,
+  onApply,
+  onExport,
+}: {
+  count: number
+  onClear: () => void
+  onApply: (op: BulkAction) => void
+  onExport: () => void
+}) {
   const project = useCurrentProject()
   const { data: people } = usePeople(project.id)
   const [label, setLabel] = useState('')
@@ -14,6 +24,9 @@ export function BulkBar({ count, onClear, onApply }: { count: number; onClear: (
     <div className="fixed inset-x-0 bottom-4 z-40 flex justify-center px-4">
       <div role="toolbar" aria-label="Acciones masivas" className="flex max-w-full flex-wrap items-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-xl">
         <span className="text-sm font-semibold">{count} seleccionada(s)</span>
+        <button className="btn-primary py-1.5" onClick={onExport}>
+          <FileDown className="h-4 w-4" /> Exportar .md
+        </button>
         <select
           aria-label="Mover a columna"
           className="input w-auto py-1.5"

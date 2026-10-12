@@ -84,8 +84,8 @@ export function InboxTab() {
 
       <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
         <p className="max-w-2xl text-[15px] text-gray-500">
-          Reportes pendientes de revisión. Revísalos y pásalos al Backlog cuando estén listos: ahí se convierten en tarjetas y la IA puede
-          trabajarlas con <code className="rounded bg-gray-100 px-1 text-[13px]">orion siguiente</code>.
+          Observaciones pendientes de revisión. Al pasarlas al Backlog se convierten en tarjetas; desde el tablero las exportas a .md
+          para enviarlas al chat del proyecto.
         </p>
         <button className="btn-primary px-5 py-3 text-[15px]" onClick={() => setDialog('new')}>Nueva observación</button>
       </div>
@@ -210,7 +210,8 @@ export function InboxTab() {
   )
 }
 
-/** Texto de la tarjeta de la lista: qué pasó, o dónde si no hay más. */
+/** Texto de la tarjeta de la lista: la descripción (o el reporte, en observaciones antiguas). */
 function summary(o: Observation): string {
-  return [o.report.actual, o.report.where].filter(Boolean).join(' — ')
+  if (o.description.trim()) return o.description
+  return o.report ? [o.report.actual, o.report.where].filter(Boolean).join(' — ') : ''
 }

@@ -35,6 +35,8 @@ export interface Project {
   favorite: boolean
   archived: boolean
   briefMd: string
+  /** Instrucciones del proyecto para Claude; encabezan cada .md exportado. */
+  aiInstructions: string
   createdAt: string
   counts: ColumnCounts
   people: Array<Pick<Person, 'id' | 'name'>>
@@ -45,6 +47,7 @@ export interface ProjectInput {
   code: string
   description: string
   color: string
+  aiInstructions?: string
 }
 
 export interface Person {
@@ -118,6 +121,8 @@ export interface Card {
   createdAt: string
   updatedAt: string
   archived: boolean
+  /** Última vez que se exportó a .md para el chat del proyecto (null = nunca). */
+  exportedAt: string | null
 }
 
 export interface CardInput {
@@ -171,7 +176,7 @@ export interface Comment {
   createdAt: string
 }
 
-export type HistoryAction = 'creada' | 'movida' | 'editada' | 'comentada' | 'archivada' | 'restaurada' | 'trabajo'
+export type HistoryAction = 'creada' | 'movida' | 'editada' | 'comentada' | 'archivada' | 'restaurada' | 'trabajo' | 'exportada'
 
 export interface HistoryEntry {
   id: number
@@ -197,6 +202,11 @@ export const CHANNELS: Channel[] = ['clientes', 'testers']
 export const OBSERVATION_KINDS: ObservationKind[] = ['bug', 'mejora', 'duda']
 export const KIND_LABEL: Record<ObservationKind, string> = { bug: 'Bug', mejora: 'Mejora', duda: 'Duda' }
 export const KIND_EMOJI: Record<ObservationKind, string> = { bug: '🐞', mejora: '💡', duda: '❓' }
+export const KIND_HINT: Record<ObservationKind, string> = {
+  bug: 'algo está roto',
+  mejora: 'algo podría funcionar mejor',
+  duda: 'no sé si es un error',
+}
 export const STATUS_LABEL: Record<ObservationStatus, string> = {
   pendiente: 'Pendiente',
   info: 'Esperando información',
@@ -213,7 +223,9 @@ export interface Observation {
   channel: Channel
   kind: ObservationKind
   title: string
-  report: Report
+  description: string
+  /** Reporte estructurado (solo observaciones antiguas); las nuevas usan `description`. */
+  report: Report | null
   attachments: Attachment[]
   sender: string
   status: ObservationStatus
@@ -227,7 +239,7 @@ export interface ObservationInput {
   channel: Channel
   kind: ObservationKind
   title: string
-  report: Report
+  description: string
   attachments?: Attachment[]
   sender?: string
 }
@@ -244,4 +256,19 @@ export interface ToBacklogInput {
   numbers: number[]
   priority?: Priority
   labels?: string[]
+}
+
+// ---------- Exportación a .md ----------
+
+export interface ExportInput {
+  numbers: number[]
+  /** true: registra la exportación en el historial (al copiar o descargar). */
+  mark?: boolean
+  /** Mover las tarjetas a esta columna al marcar la exportación (opcional). */
+  moveTo?: ColumnId
+}
+
+export interface ExportResult {
+  filename: string
+  markdown: string
 }

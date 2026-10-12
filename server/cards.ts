@@ -1,16 +1,20 @@
+import { buildExportMarkdown, exportFilename } from '../shared/exportMd'
 import { moveError } from '../shared/flow'
 import { keyBetween } from '../shared/order'
-import type {
-  Attachment,
-  BulkAction,
-  Card,
-  CardInput,
-  CardPatch,
-  ColumnId,
-  Comment,
-  HistoryAction,
-  HistoryEntry,
-  MoveInput,
+import {
+  COLUMN_IDS,
+  type ExportInput,
+  type ExportResult,
+  type Attachment,
+  type BulkAction,
+  type Card,
+  type CardInput,
+  type CardPatch,
+  type ColumnId,
+  type Comment,
+  type HistoryAction,
+  type HistoryEntry,
+  type MoveInput,
 } from '../shared/types'
 import { now, tx, type Db } from './db'
 import { NotFoundError, RuleError } from './errors'
@@ -40,6 +44,7 @@ interface CardRow {
   created_at: string
   updated_at: string
   archived: number
+  exported_at: string | null
 }
 
 interface HistoryRow {
@@ -81,6 +86,7 @@ function toCard(r: CardRow): Card {
     createdAt: r.created_at,
     updatedAt: r.updated_at,
     archived: r.archived === 1,
+    exportedAt: r.exported_at,
   }
 }
 
@@ -295,6 +301,47 @@ export function createCardsRepo(db: Db) {
         log(card, actor, 'trabajo', null, null, detail)
         return toCard(row(projectId, number))
       })
+    },
+
+    /**
+     * Genera el .md para el chat de Claude del proyecto, con las tarjetas en el orden del tablero.
+     * Con `mark`, registra la exportación (historial + exportedAt) y opcionalmente mueve las tarjetas.
+     */
+    exportMarkdown(
+      projectId: number,
+      input: ExportInput,
+      actor: string,
+      opts: { attachmentPath: (url: string) => string | null; date: string; isoDate: string },
+    ): ExportResult {
+      const project = db.prepare('SELECT name, code, ai_instructions FROM projects WHERE id = ?').get(projectId) as
+        | { name: string; code: string; ai_instructions: string }
+        | undefined
+      if (!project) throw new NotFoundError(`Proyecto #${projectId} no existe`)
+      const rows = [...new Set(input.numbers)].map((n) => row(projectId, n))
+      rows.sort((a, b) => {
+        const byCol = COLUMN_IDS.indexOf(a.column_id as ColumnId) - COLUMN_IDS.indexOf(b.column_id as ColumnId)
+        return byCol || (a.ord < b.ord ? -1 : a.ord > b.ord ? 1 : 0)
+      })
+      const numbers = rows.map((r) => r.number)
+      const filename = exportFilename({ code: project.code }, numbers, opts.isoDate)
+
+      if (input.mark) {
+        tx(db, () => {
+          for (const r of rows) {
+            db.prepare('UPDATE cards SET exported_at = ? WHERE id = ?').run(now(), r.id)
+            log(r, actor, 'exportada', null, null, filename)
+            if (input.moveTo && input.moveTo !== r.column_id) moveRow(r, actor, { column: input.moveTo })
+          }
+        })
+      }
+
+      const items = numbers.map((n) => ({ card: toCard(row(projectId, n)), comments: repo.comments(projectId, n) }))
+      const markdown = buildExportMarkdown(
+        { name: project.name, code: project.code, aiInstructions: project.ai_instructions },
+        items,
+        { date: opts.date, attachmentPath: opts.attachmentPath },
+      )
+      return { filename, markdown }
     },
 
     comments(projectId: number, number: number): Comment[] {

@@ -13,6 +13,7 @@ interface ProjectRow {
   favorite: number
   archived: number
   brief_md: string
+  ai_instructions: string
   created_at: string
 }
 
@@ -52,6 +53,7 @@ export function createRepo(db: Db) {
       favorite: r.favorite === 1,
       archived: r.archived === 1,
       briefMd: r.brief_md,
+      aiInstructions: r.ai_instructions,
       createdAt: r.created_at,
       counts: countsFor(r.id),
       people,
@@ -88,8 +90,8 @@ export function createRepo(db: Db) {
 
     createProject(input: ProjectInput): Project {
       const res = db
-        .prepare('INSERT INTO projects (name, code, description, color, created_at) VALUES (?, ?, ?, ?, ?)')
-        .run(input.name.trim(), input.code.trim().toUpperCase(), input.description.trim(), input.color, now())
+        .prepare('INSERT INTO projects (name, code, description, color, ai_instructions, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+        .run(input.name.trim(), input.code.trim().toUpperCase(), input.description.trim(), input.color, (input.aiInstructions ?? '').trim(), now())
       return repo.getProject(Number(res.lastInsertRowid))
     },
 
@@ -103,6 +105,7 @@ export function createRepo(db: Db) {
         favorite: ['favorite', patch.favorite === undefined ? undefined : patch.favorite ? 1 : 0],
         archived: ['archived', patch.archived === undefined ? undefined : patch.archived ? 1 : 0],
         briefMd: ['brief_md', patch.briefMd],
+        aiInstructions: ['ai_instructions', patch.aiInstructions?.trim()],
       }
       const sets: string[] = []
       const values: Array<string | number> = []

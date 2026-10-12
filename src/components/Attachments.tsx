@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { ChevronLeft, ChevronRight, FileText, ImagePlus, Loader2, X, ZoomIn, ZoomOut } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState, type DragEvent } from 'react'
+import { ChevronLeft, ChevronRight, FileText, ImagePlus, Loader2, Paperclip, X, ZoomIn, ZoomOut } from 'lucide-react'
 import type { Attachment } from '@shared/types'
 import { uploadFile } from '@/lib/api'
 import { errorMessage, useToast } from './Toast'
@@ -7,7 +7,18 @@ import { errorMessage, useToast } from './Toast'
 const isImage = (a: Attachment) => a.type.startsWith('image/')
 
 /** 📎 Subida múltiple: arrastrar y soltar, pegar desde el portapapeles (Ctrl+V) o elegir archivos. */
-export function AttachmentsInput({ projectId, value, onChange }: { projectId: number; value: Attachment[]; onChange: (v: Attachment[]) => void }) {
+export function AttachmentsInput({
+  projectId,
+  value,
+  onChange,
+  variant = 'dropzone',
+}: {
+  projectId: number
+  value: Attachment[]
+  onChange: (v: Attachment[]) => void
+  /** dropzone: zona grande para arrastrar; button: botón "Subir imágenes" compacto (también acepta soltar). */
+  variant?: 'dropzone' | 'button'
+}) {
   const toast = useToast()
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(0)
@@ -49,8 +60,35 @@ export function AttachmentsInput({ projectId, value, onChange }: { projectId: nu
     return () => window.removeEventListener('paste', onPaste)
   }, [upload])
 
+  const dropHandlers = {
+    onDragOver: (e: DragEvent) => {
+      e.preventDefault()
+      setOver(true)
+    },
+    onDragLeave: () => setOver(false),
+    onDrop: (e: DragEvent) => {
+      e.preventDefault()
+      setOver(false)
+      void upload([...e.dataTransfer.files])
+    },
+  }
+
   return (
     <div>
+      {variant === 'button' ? (
+        <div className="flex flex-wrap items-center gap-3" {...dropHandlers}>
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            className={`btn-outline ${over ? 'border-brand bg-blue-50 text-brand' : ''}`}
+            disabled={uploading > 0}
+          >
+            {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
+            {uploading ? `Subiendo ${uploading}…` : 'Subir imágenes'}
+          </button>
+          <span className="text-sm text-gray-400">o pega una captura con Ctrl+V</span>
+        </div>
+      ) : (
       <div
         role="button"
         tabIndex={0}
@@ -75,6 +113,7 @@ export function AttachmentsInput({ projectId, value, onChange }: { projectId: nu
         <span>{uploading ? `Subiendo ${uploading}…` : 'Arrastra imágenes aquí, pégalas con Ctrl+V o haz clic'}</span>
         <span className="text-xs text-gray-400">PNG, JPG, GIF, WebP, PDF o video · máx. 15 MB</span>
       </div>
+      )}
       <input
         ref={inputRef}
         type="file"

@@ -19,6 +19,8 @@ import type {
   ObservationInput,
   ObservationStatus,
   ToBacklogInput,
+  ExportInput,
+  ExportResult,
 } from '@shared/types'
 
 export class ApiError extends Error {
@@ -295,4 +297,9 @@ export function useObservationMutations(pid: number) {
       onSettled: refresh,
     }),
   }
+}
+
+// ---------- Exportar a .md ----------
+export function exportCards(pid: number, body: ExportInput) {
+  return api<ExportResult>(`/projects/${pid}/cards/export`, { method: 'POST', body })
 }

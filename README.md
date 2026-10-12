@@ -2,7 +2,7 @@
 
 Gestor de proyectos tipo Jira/Scrum, en español, **local y de un solo usuario**.
 Web en React, servidor Express y base SQLite en un archivo (`data/orion.db`).
-La IA (Claude Code) trabaja las tarjetas del Backlog con el comando `orion`.
+Las tarjetas del Backlog se exportan a **.md** con instrucciones para el chat de Claude de cada proyecto.
 
 ## Requisitos
 
@@ -19,53 +19,37 @@ Tus datos quedan en `data/orion.db` y las imágenes en `data/uploads/`. Para res
 
 ## Flujo de trabajo
 
-1. **Por revisar:** registra los reportes de clientes o testers con *Nueva observación*:
-   ¿Dónde? / ¿Qué hice? / ¿Qué esperaba? / ¿Qué pasó? / 📎 Imagen. Puedes pegar capturas con Ctrl+V.
-2. Revisa cada reporte y elige **Pasar al Backlog** (crea la tarjeta), **Pedir más información** o **Rechazar**.
-3. En el **Tablero**, ordena el Backlog arrastrando: lo de arriba es lo siguiente. Si quieres que algo se haga ya,
-   muévelo a *Por hacer*, que tiene prioridad sobre el Backlog.
-4. **La IA trabaja la tarjeta** con el comando `orion` (ver abajo) y la deja en *En revisión QA* con su resumen.
-5. Tú revisas y la mueves a *Hecho*, o la devuelves a *Por hacer* con un comentario.
+1. **Por revisar:** registra cada reporte con *Nueva observación*: Título, Tipo (Bug, Mejora o Duda), Descripción y
+   Screenshots (botón *Subir imágenes* o pegar con Ctrl+V). Queda pendiente de revisión.
+2. Revisa el reporte y elige **Pasar al Backlog** (de a uno o en lote: crea la tarjeta), **Pedir más información** o **Rechazar**.
+3. En el **Tablero**, ordena el Backlog arrastrando: lo de arriba va primero.
+4. **Exporta a .md** las tarjetas que quieras enviar a Claude:
+   - todo el Backlog: icono de exportar en el encabezado de la columna Backlog (o menú ⋮ → *Exportar Backlog a .md*);
+   - varias tarjetas: márcalas y pulsa *Exportar .md* en la barra inferior;
+   - una tarjeta: *Exportar .md para el chat* en su detalle.
 
-## Comando `orion` (para Claude Code)
+   Pulsa **Copiar para el chat** y pégalo en el chat de Claude del proyecto (o **Descargar .md** y adjúntalo).
+   Opcionalmente, las tarjetas pasan a *Por hacer* al exportarlas.
+5. **El tablero no se mueve solo.** El .md le indica a Claude que reporte cada paso con una línea de estado, y tú mueves la tarjeta:
 
-Instálalo una vez como comando global, desde esta carpeta:
+   | Claude escribe | Tú mueves la tarjeta a |
+   | --- | --- |
+   | `▶ #12 → En progreso` | En progreso |
+   | `⏸ #12 → Por hacer: <qué falta>` | Por hacer |
+   | `✅ #12 → En revisión QA` | En revisión QA |
 
-```bash
-npm link          # deja disponible `orion` en cualquier terminal
-```
+6. Tú revisas el trabajo y la mueves a *Hecho* (o la devuelves a *Por hacer* con un comentario).
 
-En el repo del proyecto que vas a desarrollar (por ejemplo, el código de LaGuardiaGO):
+### Instrucciones para Claude (por proyecto)
 
-```bash
-orion init LGG --claude-md   # vincula el repo al proyecto y agrega las instrucciones a su CLAUDE.md
-```
+Con el lápiz ✏️ junto al nombre del proyecto, completa **Instrucciones para Claude**: repositorio, stack, reglas de ramas,
+cómo verificar… Ese texto encabeza cada .md exportado, para que Claude trabaje igual en cada tarea.
 
-Luego, en Claude Code dentro de ese repo, basta con pedir:
+### Comando `orion` (en pausa)
 
-> toma la siguiente tarjeta del backlog de ORION e impleméntala
+El repositorio incluye el comando `orion` (`orion ayuda`) para que Claude Code tome tarjetas directamente desde la terminal.
+Por ahora **no se usa**: el flujo es exportar .md y mover las tarjetas a mano.
 
-Claude hará lo siguiente:
-
-1. Ejecuta `orion siguiente`: la tarjeta pasa a *En progreso*, asignada a 🤖 claude.
-2. Lee el reporte, los criterios y las imágenes, e implementa el cambio en una rama.
-3. Registra rama y commit con `orion trabajo`.
-4. Cierra con `orion terminar <N> -c "resumen"`: la tarjeta queda en *En revisión QA*.
-
-Lo ves en vivo en el tablero. Claude **no puede** mover tarjetas a *Hecho*.
-
-| Comando | Qué hace |
-| --- | --- |
-| `orion tablero` | Resumen de columnas y tarjetas abiertas |
-| `orion siguiente [--ver]` | Toma la siguiente tarjeta (Por hacer y luego Backlog) |
-| `orion ver <N>` | Detalle: reporte, criterios, rutas de imágenes, comentarios |
-| `orion criterio <N> <i>` | Marca un criterio de aceptación como cumplido |
-| `orion trabajo <N> --rama R --commit C` | Registra el trabajo |
-| `orion comentar <N> "…"` | Comenta en la tarjeta |
-| `orion terminar <N> -c "…"` | Pasa a En revisión QA con el resumen |
-| `orion mover <N> <columna>` | backlog, por-hacer, progreso, qa, humano, hecho |
-
-`orion ayuda` muestra todos los comandos y opciones.
 
 ## Desarrollo
 

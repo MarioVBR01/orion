@@ -75,11 +75,14 @@ export function ObservationDetailModal({ number, initial, onClose }: { number: n
                 </p>
               )}
 
-              <ReportView report={obs.report} />
+              {obs.description.trim() && (
+                <p className="text-[15px] leading-relaxed whitespace-pre-wrap text-gray-800">{obs.description}</p>
+              )}
+              {obs.report && <ReportView report={obs.report} />}
 
               {obs.attachments.length > 0 && (
                 <section>
-                  <h3 className="mb-2 text-sm font-semibold text-gray-700">📎 Imagen ({obs.attachments.length})</h3>
+                  <h3 className="mb-2 text-sm font-semibold text-gray-700">Screenshots ({obs.attachments.length})</h3>
                   <Gallery attachments={obs.attachments} />
                 </section>
               )}

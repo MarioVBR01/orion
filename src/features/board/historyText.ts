@@ -14,6 +14,8 @@ export function describeHistory(h: HistoryEntry): string {
       return 'archivó la tarjeta'
     case 'restaurada':
       return 'restauró la tarjeta'
+    case 'exportada':
+      return `exportó a ${h.detail ?? '.md'} para el chat del proyecto`
     case 'trabajo':
       return `registró trabajo: ${h.detail ?? ''}`
     case 'editada':
