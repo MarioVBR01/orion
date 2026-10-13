@@ -54,13 +54,16 @@ describe('tarjetas', () => {
     expect(comments.body[0]).toMatchObject({ text: 'Falta el botón QR', author: 'Mario' })
   })
 
-  it('Claude no puede mover a Hecho ni salir de su flujo', () => {
+  it('Claude llega hasta En revisión humano, nunca a Hecho', () => {
     const cards = createCardsRepo(db)
     cards.create(1, { title: 'X', type: 'tarea', priority: 'baja', column: 'por_hacer' }, 'Mario')
     expect(cards.move(1, 1, { column: 'en_progreso' }, 'claude').column).toBe('en_progreso')
     expect(cards.move(1, 1, { column: 'revision_qa' }, 'claude').column).toBe('revision_qa')
     expect(() => cards.move(1, 1, { column: 'hecho' }, 'claude')).toThrow(/Hecho/)
-    expect(() => cards.move(1, 1, { column: 'revision_humano' }, 'claude')).toThrow(/solo puede/)
+    // Claude entrega en revisión humana, pero de ahí en adelante decide una persona
+    expect(cards.move(1, 1, { column: 'revision_humano' }, 'claude').column).toBe('revision_humano')
+    expect(() => cards.move(1, 1, { column: 'por_hacer', comment: 'x' }, 'claude')).toThrow(/decide una persona/)
+    expect(() => cards.move(1, 1, { column: 'hecho' }, 'claude')).toThrow(/Hecho/)
     // el humano sí
     expect(cards.move(1, 1, { column: 'hecho' }, 'Mario').column).toBe('hecho')
   })

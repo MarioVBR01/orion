@@ -9,14 +9,16 @@ export interface ProjectFormValues {
   description: string
   color: string
   aiInstructions: string
+  repoPath: string
 }
 
 /** Ejemplo para el campo de instrucciones (se muestra como placeholder). */
-export const AI_INSTRUCTIONS_EXAMPLE = `- Repositorio: C:\\proyectos\\laguardiago-app (React Native + Expo)
+export const AI_INSTRUCTIONS_EXAMPLE = `- Stack: React + Electron + Firebase.
 - Antes de cambiar algo, revisa cómo está hecho en el código existente y sigue el mismo estilo.
-- Crea una rama por tarea: fix/<número>-<resumen> (bugs) o feat/<número>-<resumen> (mejoras).
-- Verifica con: npm run lint && npm test
+- No cambies la configuración de Firebase ni los archivos .env.
 - Responde en español.`
+
+export const REPO_PATH_EXAMPLE = 'C:\\Users\\usser\\Desktop\\mi-proyecto'
 
 export function ProjectFormModal({
   open,
@@ -33,7 +35,7 @@ export function ProjectFormModal({
   title: string
   submitLabel: string
 }) {
-  const empty: ProjectFormValues = { name: '', code: '', description: '', color: PROJECT_COLORS[0]!, aiInstructions: '' }
+  const empty: ProjectFormValues = { name: '', code: '', description: '', color: PROJECT_COLORS[0]!, aiInstructions: '', repoPath: '' }
   const [values, setValues] = useState<ProjectFormValues>(initial ?? empty)
   const [busy, setBusy] = useState(false)
 
@@ -91,6 +93,20 @@ export function ProjectFormModal({
         <div>
           <label className="label" htmlFor="p-desc">Descripción</label>
           <textarea id="p-desc" rows={3} className="input" value={values.description} onChange={(e) => set('description', e.target.value)} />
+        </div>
+        <div>
+          <label className="label" htmlFor="p-repo">Carpeta del proyecto (VS Code)</label>
+          <input
+            id="p-repo"
+            className="input font-mono text-[13px]"
+            value={values.repoPath}
+            onChange={(e) => set('repoPath', e.target.value)}
+            placeholder={REPO_PATH_EXAMPLE}
+          />
+          <p className="mt-1 text-xs text-gray-500">
+            Donde está el código: ahí trabaja Claude Code con las tarjetas de este tablero. Copia la ruta desde la barra del Explorador de
+            archivos.
+          </p>
         </div>
         <div>
           <label className="label" htmlFor="p-ai">Instrucciones para Claude</label>

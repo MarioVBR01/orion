@@ -19,6 +19,9 @@ import {
 } from '../shared/types'
 import { createCardsRepo } from './cards'
 import { createObservationsRepo } from './observations'
+import { createDailiesRepo } from './dailies'
+import { assertDirectory, prepareRepo } from './link'
+import { spawn } from 'node:child_process'
 import { attachmentPath, MAX_UPLOAD_BYTES, saveUpload } from './uploads'
 import { formatDateTime } from '../shared/format'
 import { RuleError } from './errors'
@@ -31,6 +34,7 @@ const projectInput = z.object({
   description: z.string().max(2000).default(''),
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).default('#2563EB'),
   aiInstructions: z.string().max(20000).optional(),
+  repoPath: z.string().trim().max(500).optional(),
 })
 const projectPatch = projectInput.partial().extend({
   favorite: z.boolean().optional(),
@@ -102,6 +106,20 @@ const toBacklogInput = z.object({
   priority: z.enum(PRIORITIES as [Priority, ...Priority[]]).optional(),
   labels: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
 })
+const dailyInput = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha inválida'),
+  notes: z.string().max(20000).optional(),
+  entries: z
+    .array(
+      z.object({
+        person: z.string().trim().max(80),
+        yesterday: z.string().max(10000).default(''),
+        today: z.string().max(10000).default(''),
+        blockers: z.string().max(10000).default(''),
+      }),
+    )
+    .max(50),
+})
 const settingsPatch = z.object({ userName: z.string().trim().min(1).max(60).optional() })
 
 const id = (v: unknown) => {
@@ -114,6 +132,7 @@ export function createApp(db: Db, opts: { staticDir?: string; uploadsDir?: strin
   const repo = createRepo(db)
   const cards = createCardsRepo(db)
   const observations = createObservationsRepo(db)
+  const dailies = createDailiesRepo(db)
   // Con un solo usuario local, el actor de la web es el nombre guardado en Ajustes.
   const actor = () => repo.getSettings().userName
   const app = express()
@@ -136,13 +155,17 @@ export function createApp(db: Db, opts: { staticDir?: string; uploadsDir?: strin
     res.json(repo.listProjects({ includeArchived: req.query.archived === '1' }))
   })
   api.post('/projects', (req, res) => {
-    res.status(201).json(repo.createProject(projectInput.parse(req.body)))
+    const body = projectInput.parse(req.body)
+    if (body.repoPath) assertDirectory(body.repoPath)
+    res.status(201).json(repo.createProject(body))
   })
   api.get('/projects/:pid', (req, res) => {
     res.json(repo.getProject(id(req.params.pid)))
   })
   api.patch('/projects/:pid', (req, res) => {
-    res.json(repo.updateProject(id(req.params.pid), projectPatch.parse(req.body)))
+    const body = projectPatch.parse(req.body)
+    if (body.repoPath) assertDirectory(body.repoPath)
+    res.json(repo.updateProject(id(req.params.pid), body))
   })
   api.delete('/projects/:pid', (req, res) => {
     repo.deleteProject(id(req.params.pid))
@@ -194,6 +217,43 @@ export function createApp(db: Db, opts: { staticDir?: string; uploadsDir?: strin
   api.get('/projects/:pid/cards/:n/history', (req, res) => {
     res.json(cards.history(id(req.params.pid), id(req.params.n)))
   })
+  // ---------- Carpeta del proyecto (VS Code) ----------
+  /** Deja la carpeta lista para Claude Code: .orion.json, sección en CLAUDE.md y permisos. */
+  api.post('/projects/:pid/prepare-repo', (req, res) => {
+    const p = repo.getProject(id(req.params.pid))
+    if (!p.repoPath) throw new RuleError('Primero indica la carpeta del proyecto (lápiz ✏️ junto al nombre).')
+    res.json(prepareRepo(p.repoPath, p))
+  })
+  api.post('/projects/:pid/open-vscode', (req, res) => {
+    const p = repo.getProject(id(req.params.pid))
+    if (!p.repoPath) throw new RuleError('El proyecto no tiene carpeta vinculada.')
+    assertDirectory(p.repoPath)
+    if (p.repoPath.includes('"')) throw new RuleError('Ruta inválida.')
+    spawn('code', [`"${p.repoPath}"`], { shell: true, detached: true, stdio: 'ignore' }).unref()
+    res.json({ ok: true })
+  })
+
+  // ---------- Daily Scrum ----------
+  api.get('/projects/:pid/dailies', (req, res) => {
+    res.json(dailies.list(id(req.params.pid)))
+  })
+  api.post('/projects/:pid/dailies', (req, res) => {
+    res.status(201).json(dailies.create(id(req.params.pid), dailyInput.parse(req.body)))
+  })
+  api.get('/projects/:pid/dailies/activity', (req, res) => {
+    res.json(dailies.activity(id(req.params.pid), String(req.query.date ?? '')))
+  })
+  api.get('/projects/:pid/dailies/:id', (req, res) => {
+    res.json(dailies.get(id(req.params.pid), id(req.params.id)))
+  })
+  api.put('/projects/:pid/dailies/:id', (req, res) => {
+    res.json(dailies.update(id(req.params.pid), id(req.params.id), dailyInput.parse(req.body)))
+  })
+  api.delete('/projects/:pid/dailies/:id', (req, res) => {
+    dailies.remove(id(req.params.pid), id(req.params.id))
+    res.status(204).end()
+  })
+
   // ---------- Exportar a .md (para el chat de Claude del proyecto) ----------
   api.post('/projects/:pid/cards/export', (req, res) => {
     const body = z

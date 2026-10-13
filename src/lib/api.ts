@@ -21,6 +21,9 @@ import type {
   ToBacklogInput,
   ExportInput,
   ExportResult,
+  DailyActivity,
+  DailyInput,
+  DailyScrum,
 } from '@shared/types'
 
 export class ApiError extends Error {
@@ -302,4 +305,53 @@ export function useObservationMutations(pid: number) {
 // ---------- Exportar a .md ----------
 export function exportCards(pid: number, body: ExportInput) {
   return api<ExportResult>(`/projects/${pid}/cards/export`, { method: 'POST', body })
+}
+
+// ---------- Carpeta del proyecto (VS Code) ----------
+export interface PrepareRepoResult {
+  dir: string
+  orionJson: string
+  claudeMd: string
+  settings: string
+  verify: string[]
+}
+export function prepareRepo(pid: number) {
+  return api<PrepareRepoResult>(`/projects/${pid}/prepare-repo`, { method: 'POST' })
+}
+export function openInVsCode(pid: number) {
+  return api<{ ok: boolean }>(`/projects/${pid}/open-vscode`, { method: 'POST' })
+}
+
+// ---------- Daily Scrum ----------
+export const dailyKeys = {
+  list: (pid: number) => ['projects', pid, 'dailies'] as const,
+  activity: (pid: number, date: string) => ['projects', pid, 'dailies', 'activity', date] as const,
+}
+export function useDailies(pid: number) {
+  return useQuery({ queryKey: dailyKeys.list(pid), queryFn: () => api<DailyScrum[]>(`/projects/${pid}/dailies`) })
+}
+export function useDailyActivity(pid: number, date: string) {
+  return useQuery({
+    queryKey: dailyKeys.activity(pid, date),
+    queryFn: () => api<DailyActivity>(`/projects/${pid}/dailies/activity?date=${date}`),
+    enabled: /^\d{4}-\d{2}-\d{2}$/.test(date),
+  })
+}
+export function useDailyMutations(pid: number) {
+  const qc = useQueryClient()
+  const refresh = () => qc.invalidateQueries({ queryKey: dailyKeys.list(pid) })
+  return {
+    create: useMutation({
+      mutationFn: (input: DailyInput) => api<DailyScrum>(`/projects/${pid}/dailies`, { method: 'POST', body: input }),
+      onSettled: refresh,
+    }),
+    update: useMutation({
+      mutationFn: ({ id, ...input }: DailyInput & { id: number }) => api<DailyScrum>(`/projects/${pid}/dailies/${id}`, { method: 'PUT', body: input }),
+      onSettled: refresh,
+    }),
+    remove: useMutation({
+      mutationFn: (id: number) => api<void>(`/projects/${pid}/dailies/${id}`, { method: 'DELETE' }),
+      onSettled: refresh,
+    }),
+  }
 }

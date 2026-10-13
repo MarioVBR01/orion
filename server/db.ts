@@ -123,6 +123,21 @@ const MIGRATIONS: string[] = [
   ALTER TABLE projects ADD COLUMN ai_instructions TEXT NOT NULL DEFAULT '';
   ALTER TABLE cards ADD COLUMN exported_at TEXT;
   `,
+  /* 5: carpeta del proyecto (VS Code) + Daily Scrum */ `
+  ALTER TABLE projects ADD COLUMN repo_path TEXT NOT NULL DEFAULT '';
+
+  CREATE TABLE daily_scrums (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id     INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    date           TEXT NOT NULL,
+    notes          TEXT NOT NULL DEFAULT '',
+    entries        TEXT NOT NULL DEFAULT '[]',
+    board_snapshot TEXT NOT NULL DEFAULT '{}',
+    created_at     TEXT NOT NULL,
+    updated_at     TEXT NOT NULL,
+    UNIQUE (project_id, date)
+  );
+  `,
 ]
 
 export function openDb(file: string): Db {

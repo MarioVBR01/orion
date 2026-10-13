@@ -3,20 +3,21 @@
  * Usa la misma base de datos y las mismas reglas que la web (server/), así que lo que hace aquí
  * aparece en vivo en el tablero.
  */
-import { existsSync, readFileSync, writeFileSync, appendFileSync } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
+import { existsSync, readFileSync } from 'node:fs'
+import { dirname, join, resolve, sep } from 'node:path'
 import { openDb } from '../server/db'
 import { createRepo } from '../server/repo'
 import { createCardsRepo } from '../server/cards'
 import { attachmentPath } from '../server/uploads'
 import { columnName } from '../shared/flow'
 import { CLAUDE, COLUMN_IDS, PRIORITY_LABEL, TYPE_LABEL, type Card, type ColumnId, type Project } from '../shared/types'
-import { CLAUDE_MD_SNIPPET, HELP } from './texts'
+import { ORION_CONFIG, prepareRepo } from '../server/link'
+import { HELP } from './texts'
 
 const ROOT = resolve(import.meta.dirname, '..')
 const DB_FILE = process.env.ORION_DB ?? join(ROOT, 'data', 'orion.db')
 const UPLOADS = process.env.ORION_UPLOADS ?? join(dirname(DB_FILE), 'uploads')
-const CONFIG = '.orion.json'
+const CONFIG = ORION_CONFIG
 
 class CliError extends Error {}
 
@@ -91,6 +92,8 @@ function findConfig(from: string): string | null {
   }
 }
 
+const normalizePath = (p: string) => resolve(p).replace(/[\\/]+$/, '').toLowerCase()
+
 function resolveProject(projects: Project[], flags: Args['flags']): Project {
   let wanted = str(flags.proyecto) ?? str(flags.p) ?? process.env.ORION_PROYECTO
   if (!wanted) {
@@ -98,6 +101,13 @@ function resolveProject(projects: Project[], flags: Args['flags']): Project {
     if (cfg) wanted = (JSON.parse(readFileSync(cfg, 'utf8')) as { proyecto?: string }).proyecto
   }
   if (!wanted) {
+    // carpeta vinculada desde ORION (campo "Carpeta del proyecto")
+    const cwd = normalizePath(process.cwd())
+    const linked = projects.find((p) => {
+      const root = p.repoPath ? normalizePath(p.repoPath) : ''
+      return root && (cwd === root || cwd.startsWith(`${root}${sep}`))
+    })
+    if (linked) return linked
     if (projects.length === 1) return projects[0]!
     throw new CliError(
       `Indica el proyecto con --proyecto <CÓDIGO> o ejecuta "orion init <CÓDIGO>" en el repo.\nProyectos: ${projects.map((p) => `${p.code} (${p.name})`).join(', ') || 'ninguno'}`,
@@ -173,20 +183,18 @@ function main(argv: string[]): string {
 
     case 'init': {
       const code = args.pos[0]
-      if (!code) throw new CliError('Uso: orion init <CÓDIGO> [--claude-md]')
+      if (!code) throw new CliError('Uso: orion init <CÓDIGO>   (desde la carpeta del proyecto)')
       const p = resolveProject(projects, { proyecto: code })
-      writeFileSync(join(process.cwd(), CONFIG), JSON.stringify({ proyecto: p.code }, null, 2) + '\n')
-      const msgs = [`Este repo quedó vinculado al proyecto ${p.name} (${p.code}) en ${CONFIG}.`]
-      if (args.flags['claude-md']) {
-        const md = join(process.cwd(), 'CLAUDE.md')
-        const current = existsSync(md) ? readFileSync(md, 'utf8') : ''
-        if (current.includes('## Tablero ORION')) msgs.push('CLAUDE.md ya tenía las instrucciones de ORION.')
-        else {
-          appendFileSync(md, `${current && !current.endsWith('\n') ? '\n' : ''}${current ? '\n' : ''}${CLAUDE_MD_SNIPPET}`)
-          msgs.push('Agregué a CLAUDE.md las instrucciones para que Claude Code trabaje con el tablero.')
-        }
-      } else msgs.push('Tip: usa --claude-md para agregar las instrucciones de trabajo a CLAUDE.md.')
-      return msgs.join('\n')
+      const dir = process.cwd()
+      const r = prepareRepo(dir, p)
+      repo.updateProject(p.id, { repoPath: dir })
+      return [
+        `Carpeta vinculada al proyecto ${p.name} (${p.code}).`,
+        `  .orion.json: ${r.orionJson}`,
+        `  CLAUDE.md (sección Tablero ORION): ${r.claudeMd}`,
+        `  .claude/settings.json (permisos): ${r.settings}`,
+        `  Verificación QA: ${r.verify.join(', ') || 'sin scripts detectados'}`,
+      ].join('\n')
     }
   }
 
@@ -216,7 +224,7 @@ function main(argv: string[]): string {
       if (!card) return out('No hay tarjetas libres en "Por hacer" ni en "Backlog". ¡Tablero al día!', null)
       if (args.flags.ver) return out(detail(card, cards.comments(pid, card.number)), card)
       const taken = take(card.number)
-      return out(`Tomaste la tarjeta (movida a En progreso, asignada a ${actor}).\n\n${detail(taken, cards.comments(pid, taken.number))}`, taken)
+      return out(`Tomaste la tarjeta #${taken.number} (En progreso, asignada a ${actor}).\n\n${detail(taken, cards.comments(pid, taken.number))}`, taken)
     }
 
     case 'ver': {
@@ -236,13 +244,33 @@ function main(argv: string[]): string {
       return out(`#${c.number} movida a ${columnName(c.column)}.`, c)
     }
 
+    case 'qa':
     case 'terminar': {
       const n = parseNumber(args.pos[0])
-      const comment = str(args.flags.c) ?? str(args.flags.comentario) ?? args.pos.slice(1).join(' ')
-      if (!comment.trim()) throw new CliError('Explica qué cambiaste: orion terminar 12 -c "Ocultar botón QR hasta finalizar; commit a1b2c3"')
+      const comment = needComment('Explica qué cambiaste: orion qa 12 -c "Oculté el botón QR hasta finalizar; src/Carrera.tsx"')
       const c = cards.move(pid, n, { column: 'revision_qa' }, actor)
-      cards.comment(pid, n, comment, actor)
-      return out(`#${c.number} lista para revisión (En revisión QA) con tu resumen.`, c)
+      cards.comment(pid, n, `QA · ${comment}`, actor)
+      return out(`#${c.number} en En revisión QA. Verifica y, si todo está bien: orion entregar ${n} -c "cómo probarlo"`, c)
+    }
+
+    case 'entregar': {
+      const n = parseNumber(args.pos[0])
+      const comment = needComment('Indica qué verificaste y cómo probarlo: orion entregar 12 -c "npm test OK. Probar: abrir carrera…"')
+      const current = cards.get(pid, n)
+      if (current.column !== 'revision_qa') {
+        throw new CliError(`#${n} está en ${columnName(current.column)}; primero pásala a QA con: orion qa ${n} -c "…"`)
+      }
+      const c = cards.move(pid, n, { column: 'revision_humano' }, actor)
+      cards.comment(pid, n, `Entregada para revisión humana · ${comment}`, actor)
+      return out(`#${c.number} entregada en En revisión humano. Una persona la probará y decidirá.`, c)
+    }
+
+    case 'bloquear': {
+      const n = parseNumber(args.pos[0])
+      const comment = needComment('Explica qué falta: orion bloquear 12 -c "¿El QR debe verse también al pagar en efectivo?"')
+      const c = cards.move(pid, n, { column: 'por_hacer' }, actor)
+      cards.comment(pid, n, `Bloqueada · ${comment}`, actor)
+      return out(`#${c.number} devuelta a Por hacer con tu pregunta. Sigue con: orion siguiente`, c)
     }
 
     case 'comentar': {
@@ -277,10 +305,18 @@ function main(argv: string[]): string {
       throw new CliError(`Comando desconocido "${args.cmd}". Escribe "orion ayuda".`)
   }
 
+  /** Toma la tarjeta: la asigna y la lleva por Por hacer hasta En progreso (cada paso queda en el historial). */
   function take(n: number): Card {
     const c = cards.get(pid, n)
     if (c.assignee !== actor) cards.update(pid, n, { assignee: actor }, actor)
+    if (c.column === 'backlog') cards.move(pid, n, { column: 'por_hacer' }, actor)
     return c.column === 'en_progreso' ? cards.get(pid, n) : cards.move(pid, n, { column: 'en_progreso' }, actor)
+  }
+
+  function needComment(usage: string): string {
+    const text = str(args.flags.c) ?? str(args.flags.comentario) ?? args.pos.slice(1).join(' ')
+    if (!text.trim()) throw new CliError(usage)
+    return text.trim()
   }
 }
 

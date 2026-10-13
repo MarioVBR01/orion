@@ -37,6 +37,8 @@ export interface Project {
   briefMd: string
   /** Instrucciones del proyecto para Claude; encabezan cada .md exportado. */
   aiInstructions: string
+  /** Carpeta del proyecto en VS Code (donde trabaja Claude Code); '' si no está vinculada. */
+  repoPath: string
   createdAt: string
   counts: ColumnCounts
   people: Array<Pick<Person, 'id' | 'name'>>
@@ -48,6 +50,7 @@ export interface ProjectInput {
   description: string
   color: string
   aiInstructions?: string
+  repoPath?: string
 }
 
 export interface Person {
@@ -272,3 +275,40 @@ export interface ExportResult {
   filename: string
   markdown: string
 }
+
+// ---------- Daily Scrum ----------
+
+export interface DailyEntry {
+  person: string
+  yesterday: string
+  today: string
+  blockers: string
+}
+
+export interface DailyScrum {
+  id: number
+  projectId: number
+  /** Fecha local AAAA-MM-DD (una por proyecto y día). */
+  date: string
+  notes: string
+  entries: DailyEntry[]
+  /** Tarjetas por columna al guardar el daily (evidencia del estado del tablero ese día). */
+  boardSnapshot: ColumnCounts
+  createdAt: string
+  updatedAt: string
+}
+
+export interface DailyInput {
+  date: string
+  notes?: string
+  entries: DailyEntry[]
+}
+
+/** Lo que pasó en el tablero desde el daily anterior (o el día previo) hasta el final del día del daily. */
+export interface DailyActivity {
+  from: string
+  to: string
+  moves: HistoryEntry[]
+}
+
+export const CLAUDE_PERSON = 'Claude (IA)'

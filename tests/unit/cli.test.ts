@@ -80,20 +80,34 @@ describe('comando orion', () => {
     expect(card).toMatchObject({ column: 'en_progreso', assignee: 'claude' })
   }, 30000)
 
-  it('flujo completo: criterio, trabajo, terminar y no puede mover a Hecho', () => {
+  it('flujo completo: qa, criterio, trabajo, entregar; nunca Hecho', () => {
+    // entregar exige pasar antes por QA
+    expect(orion('entregar', '2', '-c', 'x').err).toMatch(/primero pásala a QA/)
+    expect(orion('qa', '2').code).toBe(1) // sin resumen
+    expect(orion('qa', '2', '-c', 'Oculté el botón QR hasta finalizar la carrera').out).toMatch(/En revisión QA/)
     expect(orion('criterio', '2', '1').out).toMatch(/cumplido/)
-    expect(orion('trabajo', '2', '--rama', 'orion/2-qr', '--commit', 'a1b2c3').code).toBe(0)
-    const sinResumen = orion('terminar', '2')
-    expect(sinResumen.code).toBe(1)
-    const t = orion('terminar', '2', '-c', 'Oculté el botón QR hasta finalizar la carrera')
-    expect(t.out).toMatch(/En revisión QA/)
-    const hecho = orion('mover', '2', 'hecho')
-    expect(hecho.code).toBe(1)
-    expect(hecho.err).toMatch(/Hecho/)
+    expect(orion('trabajo', '2', '--rama', 'v1-yaleh', '--commit', 'a1b2c3').code).toBe(0)
+    const e = orion('entregar', '2', '-c', 'npm test OK. Probar: iniciar una carrera y finalizarla')
+    expect(e.out).toMatch(/En revisión humano/)
+    // desde revisión humana decide una persona
+    expect(orion('mover', '2', 'hecho').err).toMatch(/Hecho/)
+    expect(orion('bloquear', '2', '-c', 'x').err).toMatch(/decide una persona/)
     const card = JSON.parse(orion('ver', '2', '--json').out)
-    expect(card).toMatchObject({ column: 'revision_qa', branch: 'orion/2-qr', commitSha: 'a1b2c3' })
+    expect(card).toMatchObject({ column: 'revision_humano', branch: 'v1-yaleh', commitSha: 'a1b2c3' })
     expect(card.acceptance[0].done).toBe(true)
-    expect(card.comments.at(-1)).toMatchObject({ author: 'claude', text: 'Oculté el botón QR hasta finalizar la carrera' })
+    expect(card.comments.map((c: { text: string }) => c.text)).toEqual([
+      'QA · Oculté el botón QR hasta finalizar la carrera',
+      'Entregada para revisión humana · npm test OK. Probar: iniciar una carrera y finalizarla',
+    ])
+  }, 30000)
+
+  it('siguiente recorre Por hacer antes de En progreso; bloquear devuelve con la pregunta', () => {
+    const r = orion('siguiente') // #1 sigue en Backlog
+    expect(r.out).toContain('Tomaste la tarjeta #1')
+    expect(JSON.parse(orion('ver', '1', '--json').out).column).toBe('en_progreso')
+    const b = orion('bloquear', '1', '-c', '¿En qué pantalla aplica?')
+    expect(b.out).toMatch(/Por hacer/)
+    expect(JSON.parse(orion('ver', '1', '--json').out).comments.at(-1).text).toBe('Bloqueada · ¿En qué pantalla aplica?')
   }, 30000)
 
   it('errores claros', () => {
