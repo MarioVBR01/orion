@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { openDb } from '../../server/db'
 import { createRepo } from '../../server/repo'
 import { createCardsRepo } from '../../server/cards'
+import { createSprintsRepo } from '../../server/sprints'
 
 const BIN = resolve(import.meta.dirname, '../../bin/orion.mjs')
 let dir: string
@@ -108,6 +109,19 @@ describe('comando orion', () => {
     const b = orion('bloquear', '1', '-c', '¿En qué pantalla aplica?')
     expect(b.out).toMatch(/Por hacer/)
     expect(JSON.parse(orion('ver', '1', '--json').out).comments.at(-1).text).toBe('Bloqueada · ¿En qué pantalla aplica?')
+  }, 30000)
+
+  it('con un sprint activo, siguiente prioriza sus tarjetas', () => {
+    // sin sprint: la primera libre es #1 (en Por hacer, devuelta por "bloquear")
+    expect(orion('siguiente', '--ver').out).toMatch(/^#1 /)
+    const db = openDb(dbFile)
+    const cards = createCardsRepo(db)
+    const sprint = createSprintsRepo(db).create(1, { startDate: '2026-10-01', endDate: '2026-10-14' })
+    createSprintsRepo(db).start(1, sprint.id, {})
+    cards.create(1, { title: 'Del sprint', type: 'tarea', priority: 'baja', sprintId: sprint.id }, 'Mario')
+    db.close()
+    expect(orion('siguiente', '--ver').out).toMatch(/^#4 Del sprint/)
+    expect(orion('tablero').out).toContain('sprint activo: LGG Sprint 1')
   }, 30000)
 
   it('errores claros', () => {

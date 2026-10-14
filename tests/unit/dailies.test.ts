@@ -21,22 +21,22 @@ beforeEach(async () => {
 describe('Daily Scrum', () => {
   it('crea, lista, edita y elimina, con foto del tablero', async () => {
     createCardsRepo(db).create(1, { title: 'A', type: 'bug', priority: 'alta' }, 'Mario')
-    const c = await request(app).post('/api/projects/1/dailies').send({ date: '2026-10-13', notes: 'Sprint 1', entries: [entry('Mario'), entry('  ')] })
+    const c = await request(app).post('/api/projects/1/dailies').send({ date: today(), notes: 'Sprint 1', entries: [entry('Mario'), entry('  ')] })
     expect(c.status).toBe(201)
     expect(c.body.entries).toHaveLength(1)
     expect(c.body.boardSnapshot.backlog).toBe(1)
 
-    const dup = await request(app).post('/api/projects/1/dailies').send({ date: '2026-10-13', entries: [] })
+    const dup = await request(app).post('/api/projects/1/dailies').send({ date: today(), entries: [] })
     expect(dup.status).toBe(400)
-    expect(dup.body.error).toMatch(/13\/10\/2026/)
+    expect(dup.body.error).toMatch(/Ya existe un Daily Scrum para el \d{2}\/\d{2}\/\d{4}/)
 
-    await request(app).post('/api/projects/1/dailies').send({ date: '2026-10-14', entries: [] })
+    await request(app).post('/api/projects/1/dailies').send({ date: '2026-09-15', entries: [] })
     const list = await request(app).get('/api/projects/1/dailies')
-    expect(list.body.map((d: { date: string }) => d.date)).toEqual(['2026-10-14', '2026-10-13'])
+    expect(list.body.map((d: { date: string }) => d.date)).toEqual([today(), '2026-09-15'])
 
-    const u = await request(app).put(`/api/projects/1/dailies/${c.body.id}`).send({ date: '2026-10-13', entries: [entry('Mario'), entry('Leonel')] })
+    const u = await request(app).put(`/api/projects/1/dailies/${c.body.id}`).send({ date: today(), entries: [entry('Mario'), entry('Leonel')] })
     expect(u.body.entries.map((e: { person: string }) => e.person)).toEqual(['Mario', 'Leonel'])
-    const dupPerson = await request(app).put(`/api/projects/1/dailies/${c.body.id}`).send({ date: '2026-10-13', entries: [entry('Mario'), entry('mario')] })
+    const dupPerson = await request(app).put(`/api/projects/1/dailies/${c.body.id}`).send({ date: today(), entries: [entry('Mario'), entry('mario')] })
     expect(dupPerson.body.error).toMatch(/repetidos/)
 
     expect((await request(app).delete(`/api/projects/1/dailies/${c.body.id}`)).status).toBe(204)

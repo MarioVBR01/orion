@@ -10,6 +10,7 @@ import { ClaudePanel } from './ClaudePanel'
 
 const TABS = [
   { path: 'tablero', label: 'Tablero' },
+  { path: 'sprints', label: 'Sprints' },
   { path: 'por-revisar', label: 'Por revisar' },
   { path: 'daily', label: 'Daily Scrum' },
   { path: 'versiones', label: 'Versiones' },

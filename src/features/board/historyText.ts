@@ -20,6 +20,7 @@ export function describeHistory(h: HistoryEntry): string {
       return `registró trabajo: ${h.detail ?? ''}`
     case 'editada':
       if (h.detail === 'asignado') return h.to ? `asignó a ${h.to}` : 'quitó el asignado'
+      if (h.detail === 'sprint') return h.to ? `movió al sprint ${h.to}` : 'devolvió la tarjeta al Backlog (sin sprint)'
       return `editó ${h.detail ?? 'la tarjeta'}`
   }
 }

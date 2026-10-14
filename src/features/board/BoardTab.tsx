@@ -15,7 +15,7 @@ import {
 } from '@dnd-kit/core'
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { FileDown, History, Lightbulb, MoreVertical, Plus, RefreshCw, Search } from 'lucide-react'
-import { useCardMutations, useCards } from '@/lib/api'
+import { useCardMutations, useCards, useSprints } from '@/lib/api'
 import { errorMessage, useToast } from '@/components/Toast'
 import { ProgressBar, Skeleton } from '@/components/ui'
 import { groupByColumn, matchesSearch, orderBetween, progress } from '@shared/board'
@@ -47,6 +47,24 @@ export function BoardTab() {
   const m = useCardMutations(project.id)
 
   const [search, setSearch] = useState('')
+  const { data: sprints } = useSprints(project.id)
+  /** Filtro por sprint: 'todos', 'activo', 'sin' (sin sprint) o el id de un sprint. */
+  const [sprintFilter, setSprintFilter] = useState<string>(() => {
+    try {
+      return localStorage.getItem(`orion:filtro-sprint:${project.id}`) ?? 'todos'
+    } catch {
+      return 'todos'
+    }
+  })
+  const changeSprintFilter = (v: string) => {
+    setSprintFilter(v)
+    try {
+      localStorage.setItem(`orion:filtro-sprint:${project.id}`, v)
+    } catch {
+      /* almacenamiento no disponible */
+    }
+  }
+  const activeSprint = sprints?.find((s) => s.status === 'activo')
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [params, setParams] = useSearchParams()
   // ?tarjeta=N abre el detalle (enlaces desde Por revisar)
@@ -73,7 +91,15 @@ export function BoardTab() {
   const dragOrigin = useRef<{ column: ColumnId; index: number } | null>(null)
 
   const byNumber = useMemo(() => new Map((cards ?? []).map((c) => [c.number, c])), [cards])
-  const visible = useMemo(() => (cards ?? []).filter((c) => matchesSearch(c, search)), [cards, search])
+  const visible = useMemo(() => {
+    const bySprint = (c: Card) => {
+      if (sprintFilter === 'todos') return true
+      if (sprintFilter === 'sin') return c.sprintId === null
+      if (sprintFilter === 'activo') return activeSprint ? c.sprintId === activeSprint.id : true
+      return c.sprintId === Number(sprintFilter)
+    }
+    return (cards ?? []).filter((c) => matchesSearch(c, search) && bySprint(c))
+  }, [cards, search, sprintFilter, activeSprint])
   const groups = useMemo(() => groupByColumn(visible), [visible])
   const stats = useMemo(() => progress(cards ?? []), [cards])
   /** Orden de navegación ←/→ en el detalle: columna por columna, de arriba abajo. */
@@ -198,6 +224,14 @@ export function BoardTab() {
               onChange={(e) => setSearch(e.target.value)}
             />
           </label>
+          <select aria-label="Filtrar por sprint" className="input w-auto" value={sprintFilter} onChange={(e) => changeSprintFilter(e.target.value)}>
+            <option value="todos">Todos los sprints</option>
+            <option value="activo">Sprint activo{activeSprint ? `: ${activeSprint.name}` : ' (ninguno)'}</option>
+            {(sprints ?? []).filter((s) => s.status !== 'activo').map((s) => (
+              <option key={s.id} value={s.id}>{s.name}{s.status === 'completado' ? ' (completado)' : ''}</option>
+            ))}
+            <option value="sin">Sin sprint</option>
+          </select>
           <div className="ml-auto flex items-center gap-2">
             <button className="btn-icon" aria-label="Ideas y sugerencias" title="Ideas" onClick={() => setPanel('ideas')}>
               <Lightbulb className="h-5 w-5" />

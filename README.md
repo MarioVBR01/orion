@@ -31,7 +31,9 @@ Por revisar ─(tú)─▶ Backlog ─(Claude)─▶ Por hacer ▶ En progreso �
 1. **Por revisar:** registra cada reporte con *Nueva observación*: Título, Tipo (Bug, Mejora o Duda), Descripción y
    Screenshots (botón *Subir imágenes* o pegar con Ctrl+V).
 2. Revisa el reporte y elige **Pasar al Backlog** (de a uno o en lote), **Pedir más información** o **Rechazar**.
-3. En el **Tablero**, ordena el Backlog arrastrando: lo de arriba va primero. Lo que pongas en *Por hacer* va antes que el Backlog.
+3. **Sprints** (como el backlog de Jira): crea sprints con sus fechas, arrastra actividades del Backlog a cada sprint, *Iniciar sprint*
+   y, al terminar, *Completar sprint* (lo pendiente pasa al Backlog o al siguiente sprint). Claude toma primero las tarjetas del
+   sprint activo. En el **Tablero** puedes filtrar por sprint y ordenar arrastrando: lo de arriba va primero.
 4. **Trabajar con Claude** (botón en la cabecera del proyecto):
    1. *Preparar para Claude* (una vez): deja la carpeta lista.
    2. *Abrir en VS Code*, abrir Claude Code y pegar la orden ("Trabaja el backlog de ORION…").
@@ -39,8 +41,9 @@ Por revisar ─(tú)─▶ Backlog ─(Claude)─▶ Por hacer ▶ En progreso �
       proyecto) y la deja en **En revisión humano** con instrucciones de cómo probarla. El tablero se mueve solo.
 5. **Tú pruebas la aplicación** y mueves a **Hecho**, o devuelves la tarjeta a *Por hacer* con un comentario, o reportas el
    error en *Por revisar*. Claude nunca mueve a Hecho ni hace push.
-6. **Daily Scrum:** registra cada día qué hizo, qué hará y los impedimentos de cada persona (y de Claude). ORION agrega la
-   actividad del tablero del periodo y el estado de las columnas. Exporta cada daily a **PDF** como evidencia.
+6. **Daily Scrum:** registra cada día (también fechas pasadas) qué hizo, qué hará y los impedimentos de cada persona (y de Claude).
+   ORION agrega la actividad del tablero del periodo, el estado de las columnas en esa fecha y el sprint al que pertenece.
+   Exporta cada daily a **PDF** como evidencia.
 
 ### Vincular un proyecto con su carpeta
 

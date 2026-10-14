@@ -1,6 +1,7 @@
 import type { Content, TDocumentDefinitions } from 'pdfmake/interfaces'
 import { columnName } from '@shared/flow'
-import { COLUMNS, type DailyActivity, type DailyScrum, type Project } from '@shared/types'
+import { formatRange, sprintDay, sprintForDate } from '@shared/sprintDates'
+import { COLUMNS, type DailyActivity, type DailyScrum, type Project, type Sprint } from '@shared/types'
 import { formatDateTime } from '@/lib/format'
 
 /** "2026-10-13" → "lunes, 13/10/2026" */
@@ -32,10 +33,34 @@ export function periodText(a: Pick<DailyActivity, 'from' | 'to'>): string {
   return `${day(new Date(a.from))} al ${day(end)}`
 }
 
-export function buildDailyDoc(project: Pick<Project, 'name' | 'code'>, daily: DailyScrum, activity: DailyActivity | undefined): TDocumentDefinitions {
+/** "SCAL Sprint 1 · día 3 de 15 (14 sep – 28 sep)" para el daily, o null si la fecha no cae en un sprint. */
+export function sprintLine(sprints: Sprint[], date: string): string | null {
+  const s = sprintForDate(sprints, date)
+  if (!s?.startDate || !s.endDate) return null
+  const d = sprintDay(s, date)
+  return `${s.name} · día ${d?.day} de ${d?.total} (${formatRange(s.startDate, s.endDate)})${s.goal ? ` · Objetivo: ${s.goal}` : ''}`
+}
+
+/** Cuándo se tomó la foto del tablero: al final del día del daily, o al guardar si es hoy. */
+export function snapshotNote(daily: Pick<DailyScrum, 'date' | 'updatedAt'>): string {
+  const saved = new Date(daily.updatedAt)
+  const sameDay = `${saved.getFullYear()}-${String(saved.getMonth() + 1).padStart(2, '0')}-${String(saved.getDate()).padStart(2, '0')}` === daily.date
+  return sameDay
+    ? `Estado del tablero al guardar el daily (${formatDateTime(saved)}).`
+    : `Estado del tablero al final del ${daily.date.split('-').reverse().join('/')} (reconstruido con el historial).`
+}
+
+export function buildDailyDoc(
+  project: Pick<Project, 'name' | 'code'>,
+  daily: DailyScrum,
+  activity: DailyActivity | undefined,
+  sprints: Sprint[] = [],
+): TDocumentDefinitions {
+  const sprint = sprintLine(sprints, daily.date)
   const content: Content[] = [
     { text: 'Daily Scrum', style: 'title' },
-    { text: `${project.name} (${project.code}) · ${longDate(daily.date)}`, style: 'subtitle' },
+    { text: `${project.name} (${project.code}) · ${longDate(daily.date)}`, style: 'subtitle', margin: [0, 2, 0, sprint ? 2 : 10] },
+    ...(sprint ? [{ text: pdfSafe(`Sprint: ${sprint}`), style: 'muted', fontSize: 9, margin: [0, 0, 0, 10] } as Content] : []),
   ]
 
   if (daily.notes.trim()) {
@@ -106,7 +131,7 @@ export function buildDailyDoc(project: Pick<Project, 'name' | 'code'>, daily: Da
     },
     layout: 'lightHorizontalLines',
   })
-  content.push({ text: `Estado registrado al guardar el daily (${formatDateTime(new Date(daily.updatedAt))}).`, style: 'muted', margin: [0, 4, 0, 0] })
+  content.push({ text: snapshotNote(daily), style: 'muted', margin: [0, 4, 0, 0] })
 
   return {
     pageSize: 'A4',
@@ -132,8 +157,13 @@ export function buildDailyDoc(project: Pick<Project, 'name' | 'code'>, daily: Da
 }
 
 /** Genera y descarga el PDF (pdfmake se carga solo al exportar). */
-export async function downloadDailyPdf(project: Pick<Project, 'name' | 'code'>, daily: DailyScrum, activity: DailyActivity | undefined) {
+export async function downloadDailyPdf(
+  project: Pick<Project, 'name' | 'code'>,
+  daily: DailyScrum,
+  activity: DailyActivity | undefined,
+  sprints: Sprint[] = [],
+) {
   const [{ default: pdfMake }, { default: vfs }] = await Promise.all([import('pdfmake/build/pdfmake'), import('pdfmake/build/vfs_fonts')])
   pdfMake.addVirtualFileSystem(vfs)
-  await pdfMake.createPdf(buildDailyDoc(project, daily, activity)).download(`${project.code}-daily-${daily.date}.pdf`)
+  await pdfMake.createPdf(buildDailyDoc(project, daily, activity, sprints)).download(`${project.code}-daily-${daily.date}.pdf`)
 }

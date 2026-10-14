@@ -24,6 +24,8 @@ import type {
   DailyActivity,
   DailyInput,
   DailyScrum,
+  Sprint,
+  SprintInput,
 } from '@shared/types'
 
 export class ApiError extends Error {
@@ -353,5 +355,39 @@ export function useDailyMutations(pid: number) {
       mutationFn: (id: number) => api<void>(`/projects/${pid}/dailies/${id}`, { method: 'DELETE' }),
       onSettled: refresh,
     }),
+  }
+}
+
+// ---------- Sprints ----------
+export const sprintKeys = { list: (pid: number) => ['projects', pid, 'sprints'] as const }
+
+export function useSprints(pid: number) {
+  return useQuery({ queryKey: sprintKeys.list(pid), queryFn: () => api<Sprint[]>(`/projects/${pid}/sprints`) })
+}
+
+export function useSprintMutations(pid: number) {
+  const qc = useQueryClient()
+  const refresh = () => {
+    void qc.invalidateQueries({ queryKey: sprintKeys.list(pid) })
+    void qc.invalidateQueries({ queryKey: cardKeys.all(pid) })
+    void qc.invalidateQueries({ queryKey: cardKeys.activity(pid) })
+  }
+  const base = `/projects/${pid}/sprints`
+  return {
+    create: useMutation({ mutationFn: (input: SprintInput) => api<Sprint>(base, { method: 'POST', body: input }), onSettled: refresh }),
+    update: useMutation({
+      mutationFn: ({ id, ...input }: SprintInput & { id: number }) => api<Sprint>(`${base}/${id}`, { method: 'PATCH', body: input }),
+      onSettled: refresh,
+    }),
+    start: useMutation({
+      mutationFn: ({ id, ...input }: SprintInput & { id: number }) => api<Sprint>(`${base}/${id}/start`, { method: 'POST', body: input }),
+      onSettled: refresh,
+    }),
+    complete: useMutation({
+      mutationFn: ({ id, moveTo }: { id: number; moveTo: 'backlog' | number }) =>
+        api<Sprint>(`${base}/${id}/complete`, { method: 'POST', body: { moveTo } }),
+      onSettled: refresh,
+    }),
+    remove: useMutation({ mutationFn: (id: number) => api<void>(`${base}/${id}`, { method: 'DELETE' }), onSettled: refresh }),
   }
 }

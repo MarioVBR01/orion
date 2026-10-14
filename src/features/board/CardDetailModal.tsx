@@ -4,7 +4,7 @@ import { Gallery } from '@/components/Attachments'
 import { Markdown } from '@/components/Markdown'
 import { ReportEditor, ReportView, emptyReport } from '@/components/ReportEditor'
 import { errorMessage, useToast } from '@/components/Toast'
-import { useCardHistory, useCardMutations, useComments, usePeople } from '@/lib/api'
+import { useCardHistory, useCardMutations, useComments, usePeople, useSprints } from '@/lib/api'
 import { formatDateTime } from '@/lib/format'
 import { useCurrentProject } from '@/features/project/ProjectContext'
 import { isReturn } from '@shared/flow'
@@ -68,6 +68,7 @@ function CardDetail({ card, onClose, onNavigate }: { card: Card; onClose: () => 
   const [title, setTitle] = useState(card.title)
   const [pendingReturn, setPendingReturn] = useState<ColumnId | null>(null)
   const [exporting, setExporting] = useState(false)
+  const { data: sprints } = useSprints(project.id)
 
   const save = (patch: CardPatch, ok?: string) =>
     m.update.mutate(
@@ -156,6 +157,24 @@ function CardDetail({ card, onClose, onNavigate }: { card: Card; onClose: () => 
           </div>
           <Field label="Asignado" htmlFor="cd-assignee">
             <AssigneeSelect id="cd-assignee" value={card.assignee} onChange={(assignee) => save({ assignee })} />
+          </Field>
+          <Field label="Sprint" htmlFor="cd-sprint">
+            <select
+              id="cd-sprint"
+              className="input"
+              value={card.sprintId ?? ''}
+              onChange={(e) => save({ sprintId: e.target.value ? Number(e.target.value) : null })}
+            >
+              <option value="">Backlog (sin sprint)</option>
+              {(sprints ?? [])
+                .filter((s) => s.status !== 'completado' || s.id === card.sprintId)
+                .map((s) => (
+                  <option key={s.id} value={s.id} disabled={s.status === 'completado'}>
+                    {s.name}
+                    {s.status === 'activo' ? ' (activo)' : s.status === 'completado' ? ' (completado)' : ''}
+                  </option>
+                ))}
+            </select>
           </Field>
 
           <div className="space-y-2">

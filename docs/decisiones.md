@@ -77,3 +77,21 @@ El usuario decidió no usar Firebase: ORION será local y solo lo usará él. Fi
 48. **Daily Scrum reemplaza a Testing.** Hay uno por proyecto y fecha, con notas, participantes (ayer / hoy / impedimentos) y la foto de las columnas al guardar. La actividad del tablero (tarjetas creadas y movidas) va desde el día siguiente al daily anterior (o el día previo, si es el primero) hasta el final del día del daily. "Agregar Claude (IA)" rellena su "ayer" con las tarjetas que movió.
 49. **PDF** con pdfmake, generado en el navegador y cargado solo al exportar, para no hacer más pesada la app. La fuente Roboto no tiene flechas ni emojis: en el PDF "→" se muestra como "»" y los emojis se quitan.
 50. **Exportar a .md** se mantiene como alternativa manual, para proyectos sin carpeta o para otros chats.
+
+## Sprints y dailies con fecha pasada (pedido del usuario)
+
+51. **Dailies de cualquier fecha hasta hoy.** El botón *Nuevo Daily Scrum* está siempre disponible (antes, si existía el de hoy, solo lo abría). La fecha de un daily se puede cambiar al editarlo.
+52. **La foto del tablero de un daily** se reconstruye con el historial al final del día del daily (o al momento de guardar, si es hoy). Así un daily de septiembre muestra el tablero de septiembre. Las tarjetas creadas después de esa fecha no cuentan; las archivadas tampoco.
+53. **Sprints al estilo Jira** (pestaña *Sprints*):
+    - Sprints abiertos (el activo primero), Backlog al final y sprints completados plegados.
+    - En cada sprint: nombre, fechas o *Añadir fechas*, número de actividades y contadores gris/azul/verde (por hacer: Backlog y Por hacer; en curso: En progreso, QA y revisión humana; hecho).
+    - Botones *Iniciar sprint* y *Completar sprint*, menú ⋯ con Editar y Eliminar, *+ Crear* en línea, y arrastrar o mover en lote entre sprints.
+54. **Reglas de sprint:**
+    - Numeración propia por proyecto, con nombre por defecto `<CÓDIGO> Sprint N`. Las fechas pueden ser pasadas.
+    - Solo un sprint activo a la vez, y para iniciarlo hacen falta fechas.
+    - Al completarlo, las tarjetas no terminadas van al Backlog o a un sprint futuro; las terminadas se quedan como evidencia.
+    - Un sprint completado no se elimina ni recibe tarjetas. Al eliminar un sprint, sus tarjetas vuelven al Backlog.
+    - Todo cambio de sprint queda en el historial de la tarjeta.
+55. **El sprint no reemplaza las columnas:** el tablero sigue mostrando todas las tarjetas, con un filtro por sprint que se recuerda por proyecto (Todos, Sprint activo, un sprint o Sin sprint).
+56. **Claude prioriza el sprint activo:** `orion siguiente` toma primero las tarjetas del sprint activo (Por hacer y luego Backlog) y después el resto.
+57. **Daily ↔ sprint:** cada daily muestra a qué sprint pertenece su fecha, con "día N de M" y el objetivo, en la lista, en el editor y en el PDF.

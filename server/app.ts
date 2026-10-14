@@ -20,6 +20,7 @@ import {
 import { createCardsRepo } from './cards'
 import { createObservationsRepo } from './observations'
 import { createDailiesRepo } from './dailies'
+import { createSprintsRepo } from './sprints'
 import { assertDirectory, prepareRepo } from './link'
 import { spawn } from 'node:child_process'
 import { attachmentPath, MAX_UPLOAD_BYTES, saveUpload } from './uploads'
@@ -64,6 +65,7 @@ const cardInput = z.object({
   descriptionMd: z.string().max(50000).optional(),
   report: report.nullable().optional(),
   acceptance: acceptance.optional(),
+  sprintId: z.number().int().positive().nullable().optional(),
 })
 const cardPatch = cardInput.omit({ column: true }).partial().extend({
   branch: z.string().trim().max(200).nullable().optional(),
@@ -83,6 +85,7 @@ const bulkInput = z.object({
     z.object({ action: z.literal('assign'), assignee: z.string().trim().max(80).nullable() }),
     z.object({ action: z.literal('label'), label: z.string().trim().min(1).max(40) }),
     z.object({ action: z.literal('archive') }),
+    z.object({ action: z.literal('sprint'), sprintId: z.number().int().positive().nullable() }),
   ]),
 })
 const commentInput = z.object({ text: z.string().trim().min(1, 'El comentario está vacío').max(10000) })
@@ -120,6 +123,13 @@ const dailyInput = z.object({
     )
     .max(50),
 })
+const sprintDate = z.union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha inválida'), z.literal(''), z.null()]).optional()
+const sprintInput = z.object({
+  name: z.string().trim().max(80).optional(),
+  goal: z.string().max(2000).optional(),
+  startDate: sprintDate,
+  endDate: sprintDate,
+})
 const settingsPatch = z.object({ userName: z.string().trim().min(1).max(60).optional() })
 
 const id = (v: unknown) => {
@@ -133,6 +143,7 @@ export function createApp(db: Db, opts: { staticDir?: string; uploadsDir?: strin
   const cards = createCardsRepo(db)
   const observations = createObservationsRepo(db)
   const dailies = createDailiesRepo(db)
+  const sprints = createSprintsRepo(db)
   // Con un solo usuario local, el actor de la web es el nombre guardado en Ajustes.
   const actor = () => repo.getSettings().userName
   const app = express()
@@ -231,6 +242,28 @@ export function createApp(db: Db, opts: { staticDir?: string; uploadsDir?: strin
     if (p.repoPath.includes('"')) throw new RuleError('Ruta inválida.')
     spawn('code', [`"${p.repoPath}"`], { shell: true, detached: true, stdio: 'ignore' }).unref()
     res.json({ ok: true })
+  })
+
+  // ---------- Sprints ----------
+  api.get('/projects/:pid/sprints', (req, res) => {
+    res.json(sprints.list(id(req.params.pid)))
+  })
+  api.post('/projects/:pid/sprints', (req, res) => {
+    res.status(201).json(sprints.create(id(req.params.pid), sprintInput.parse(req.body)))
+  })
+  api.patch('/projects/:pid/sprints/:id', (req, res) => {
+    res.json(sprints.update(id(req.params.pid), id(req.params.id), sprintInput.parse(req.body)))
+  })
+  api.post('/projects/:pid/sprints/:id/start', (req, res) => {
+    res.json(sprints.start(id(req.params.pid), id(req.params.id), sprintInput.parse(req.body)))
+  })
+  api.post('/projects/:pid/sprints/:id/complete', (req, res) => {
+    const body = z.object({ moveTo: z.union([z.literal('backlog'), z.number().int().positive()]) }).parse(req.body)
+    res.json(sprints.complete(id(req.params.pid), id(req.params.id), body, actor()))
+  })
+  api.delete('/projects/:pid/sprints/:id', (req, res) => {
+    sprints.remove(id(req.params.pid), id(req.params.id))
+    res.status(204).end()
   })
 
   // ---------- Daily Scrum ----------

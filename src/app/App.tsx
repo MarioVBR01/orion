@@ -6,6 +6,7 @@ import { PeopleTab } from '@/features/project/PeopleTab'
 import { BoardTab } from '@/features/board/BoardTab'
 import { InboxTab } from '@/features/inbox/InboxTab'
 import { DailyTab } from '@/features/daily/DailyTab'
+import { SprintsTab } from '@/features/sprints/SprintsTab'
 import { ToastProvider } from '@/components/Toast'
 import { EmptyState } from '@/components/ui'
 import { queryClient } from '@/lib/api'
@@ -22,6 +23,7 @@ export function App() {
               <Route path="/proyectos" element={<ProjectsPage />} />
               <Route path="/proyectos/:pid" element={<ProjectLayout />}>
                 <Route path="tablero" element={<BoardTab />} />
+                <Route path="sprints" element={<SprintsTab />} />
                 <Route path="por-revisar" element={<InboxTab />} />
                 <Route path="daily" element={<DailyTab />} />
                 <Route path="versiones" element={<ComingSoon title="Versiones" phase={6} />} />

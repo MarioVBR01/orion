@@ -8,6 +8,7 @@ import { dirname, join, resolve, sep } from 'node:path'
 import { openDb } from '../server/db'
 import { createRepo } from '../server/repo'
 import { createCardsRepo } from '../server/cards'
+import { createSprintsRepo } from '../server/sprints'
 import { attachmentPath } from '../server/uploads'
 import { columnName } from '../shared/flow'
 import { CLAUDE, COLUMN_IDS, PRIORITY_LABEL, TYPE_LABEL, type Card, type ColumnId, type Project } from '../shared/types'
@@ -153,11 +154,18 @@ function detail(c: Card, comments: Array<{ author: string; text: string; created
 }
 
 /** Siguiente tarjeta a trabajar: primero lo comprometido en "Por hacer", luego el Backlog, en el orden del tablero. */
-function nextCard(cards: Card[]): Card | undefined {
+/**
+ * Siguiente tarjeta: primero las del sprint activo (si hay), luego el resto;
+ * dentro de cada grupo, Por hacer antes que Backlog y en el orden del tablero.
+ */
+function nextCard(cards: Card[], activeSprintId: number | null): Card | undefined {
   const free = (c: Card) => c.assignee === null || c.assignee === CLAUDE
-  for (const col of ['por_hacer', 'backlog'] as ColumnId[]) {
-    const found = cards.filter((c) => c.column === col && free(c)).sort((a, b) => (a.order < b.order ? -1 : 1))[0]
-    if (found) return found
+  const groups = activeSprintId === null ? [cards] : [cards.filter((c) => c.sprintId === activeSprintId), cards]
+  for (const group of groups) {
+    for (const col of ['por_hacer', 'backlog'] as ColumnId[]) {
+      const found = group.filter((c) => c.column === col && free(c)).sort((a, b) => (a.order < b.order ? -1 : 1))[0]
+      if (found) return found
+    }
   }
   return undefined
 }
@@ -175,6 +183,7 @@ function main(argv: string[]): string {
   const db = openDb(DB_FILE)
   const repo = createRepo(db)
   const cards = createCardsRepo(db)
+  const sprints = createSprintsRepo(db)
   const projects = repo.listProjects()
 
   switch (args.cmd) {
@@ -204,7 +213,8 @@ function main(argv: string[]): string {
   switch (args.cmd) {
     case 'tablero': {
       const all = cards.list(pid)
-      const lines = [`${project.name} (${project.code})`]
+      const active = sprints.active(pid)
+      const lines = [`${project.name} (${project.code})${active ? ` · sprint activo: ${active.name} (${active.startDate} a ${active.endDate})` : ''}`]
       for (const col of COLUMN_IDS) {
         const inCol = all.filter((c) => c.column === col)
         lines.push('', `${columnName(col)} (${inCol.length})`)
@@ -220,7 +230,7 @@ function main(argv: string[]): string {
     }
 
     case 'siguiente': {
-      const card = nextCard(cards.list(pid))
+      const card = nextCard(cards.list(pid), sprints.active(pid)?.id ?? null)
       if (!card) return out('No hay tarjetas libres en "Por hacer" ni en "Backlog". ¡Tablero al día!', null)
       if (args.flags.ver) return out(detail(card, cards.comments(pid, card.number)), card)
       const taken = take(card.number)

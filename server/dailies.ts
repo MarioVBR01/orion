@@ -43,12 +43,28 @@ export function createDailiesRepo(db: Db) {
     return r
   }
 
-  function snapshot(projectId: number): ColumnCounts {
+  /**
+   * Tarjetas por columna al final del día del daily (o ahora, si el día no terminó),
+   * reconstruido con el historial: así un daily con fecha pasada muestra el tablero de esa fecha.
+   */
+  function snapshot(projectId: number, date: string): ColumnCounts {
     const counts = Object.fromEntries(COLUMN_IDS.map((c) => [c, 0])) as ColumnCounts
+    const endOfDay = localMidnight(date)
+    endOfDay.setDate(endOfDay.getDate() + 1)
+    const end = (endOfDay.getTime() > Date.now() ? new Date() : endOfDay).toISOString()
     const rows = db
-      .prepare('SELECT column_id, COUNT(*) AS n FROM cards WHERE project_id = ? AND archived = 0 GROUP BY column_id')
-      .all(projectId) as Array<{ column_id: string; n: number }>
-    for (const r of rows) if (r.column_id in counts) counts[r.column_id as keyof ColumnCounts] = r.n
+      .prepare(
+        `SELECT c.column_id AS current,
+           (SELECT h.to_value FROM history h
+             WHERE h.card_id = c.id AND h.action IN ('creada', 'movida') AND h.at < ?
+             ORDER BY h.id DESC LIMIT 1) AS at_date
+         FROM cards c WHERE c.project_id = ? AND c.archived = 0 AND c.created_at < ?`,
+      )
+      .all(end, projectId, end) as Array<{ current: string; at_date: string | null }>
+    for (const r of rows) {
+      const col = (r.at_date ?? r.current) as keyof ColumnCounts
+      if (col in counts) counts[col]++
+    }
     return counts
   }
 
@@ -82,7 +98,7 @@ export function createDailiesRepo(db: Db) {
       const at = now()
       const res = db
         .prepare('INSERT INTO daily_scrums (project_id, date, notes, entries, board_snapshot, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
-        .run(projectId, c.date, c.notes, JSON.stringify(c.entries), JSON.stringify(snapshot(projectId)), at, at)
+        .run(projectId, c.date, c.notes, JSON.stringify(c.entries), JSON.stringify(snapshot(projectId, c.date)), at, at)
       return repo.get(projectId, Number(res.lastInsertRowid))
     },
 
@@ -96,7 +112,7 @@ export function createDailiesRepo(db: Db) {
         c.date,
         c.notes,
         JSON.stringify(c.entries),
-        JSON.stringify(snapshot(projectId)),
+        JSON.stringify(snapshot(projectId, c.date)),
         now(),
         id,
       )

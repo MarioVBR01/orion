@@ -2,10 +2,10 @@ import { useMemo, useState } from 'react'
 import { Bot, FileDown, Plus, Trash2, UserPlus, Users } from 'lucide-react'
 import { Modal, Skeleton } from '@/components/ui'
 import { errorMessage, useToast } from '@/components/Toast'
-import { useDailyActivity, useDailyMutations, usePeople } from '@/lib/api'
+import { useDailyActivity, useDailyMutations, usePeople, useSprints } from '@/lib/api'
 import { useCurrentProject } from '@/features/project/ProjectContext'
 import { CLAUDE, CLAUDE_PERSON, COLUMNS, type DailyEntry, type DailyScrum } from '@shared/types'
-import { downloadDailyPdf, longDate, moveText, periodText } from './dailyPdf'
+import { downloadDailyPdf, longDate, moveText, periodText, snapshotNote, sprintLine } from './dailyPdf'
 
 export function todayIso(): string {
   const d = new Date()
@@ -20,6 +20,7 @@ export function DailyEditor({ daily, onClose }: { daily?: DailyScrum; onClose: (
   const toast = useToast()
   const m = useDailyMutations(project.id)
   const { data: people } = usePeople(project.id)
+  const { data: sprints } = useSprints(project.id)
   const [date, setDate] = useState(daily?.date ?? todayIso())
   const [notes, setNotes] = useState(daily?.notes ?? '')
   const [entries, setEntries] = useState<DailyEntry[]>(daily?.entries.length ? daily.entries : [emptyEntry()])
@@ -71,7 +72,7 @@ export function DailyEditor({ daily, onClose }: { daily?: DailyScrum; onClose: (
     try {
       const d = await save()
       if (d) {
-        await downloadDailyPdf(project, d, activity)
+        await downloadDailyPdf(project, d, activity, sprints ?? [])
         toast.success(`PDF del daily del ${longDate(d.date)} descargado.`)
       }
     } catch (e) {
@@ -124,7 +125,8 @@ export function DailyEditor({ daily, onClose }: { daily?: DailyScrum; onClose: (
         <div className="grid gap-4 sm:grid-cols-[200px_1fr]">
           <div>
             <label className="label" htmlFor="d-date">Fecha</label>
-            <input id="d-date" type="date" required className="input" value={date} onChange={(e) => setDate(e.target.value)} />
+            <input id="d-date" type="date" required max={todayIso()} className="input" value={date} onChange={(e) => setDate(e.target.value)} />
+            <p className="mt-1 text-xs text-gray-500">{sprintLine(sprints ?? [], date) ?? 'Esta fecha no cae en ningún sprint.'}</p>
           </div>
           <div>
             <label className="label" htmlFor="d-notes">Notas generales <span className="font-normal text-gray-400">(opcional)</span></label>
@@ -233,7 +235,7 @@ export function DailyEditor({ daily, onClose }: { daily?: DailyScrum; onClose: (
               </div>
             ))}
           </div>
-          <p className="mt-1 text-xs text-gray-400">{saved ? 'Registrado al guardar este daily.' : 'Se registrará al guardar.'}</p>
+          <p className="mt-1 text-xs text-gray-400">{saved ? snapshotNote(saved) : 'Se calculará al guardar, según la fecha del daily.'}</p>
         </section>
       </div>
     </Modal>

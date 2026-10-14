@@ -138,6 +138,22 @@ const MIGRATIONS: string[] = [
     UNIQUE (project_id, date)
   );
   `,
+  /* 6: sprints */ `
+  CREATE TABLE sprints (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id   INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    number       INTEGER NOT NULL,
+    name         TEXT NOT NULL,
+    goal         TEXT NOT NULL DEFAULT '',
+    start_date   TEXT,
+    end_date     TEXT,
+    status       TEXT NOT NULL DEFAULT 'futuro',
+    completed_at TEXT,
+    created_at   TEXT NOT NULL,
+    UNIQUE (project_id, number)
+  );
+  CREATE INDEX cards_sprint ON cards (project_id, sprint_id);
+  `,
 ]
 
 export function openDb(file: string): Db {

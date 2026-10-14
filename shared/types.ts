@@ -138,6 +138,7 @@ export interface CardInput {
   descriptionMd?: string
   report?: Report | null
   acceptance?: AcceptanceItem[]
+  sprintId?: number | null
 }
 
 export type CardPatch = Partial<
@@ -155,6 +156,7 @@ export type CardPatch = Partial<
     | 'prUrl'
     | 'commitSha'
     | 'archived'
+    | 'sprintId'
   >
 >
 
@@ -170,6 +172,7 @@ export type BulkAction =
   | { action: 'assign'; assignee: string | null }
   | { action: 'label'; label: string }
   | { action: 'archive' }
+  | { action: 'sprint'; sprintId: number | null }
 
 export interface Comment {
   id: number
@@ -312,3 +315,41 @@ export interface DailyActivity {
 }
 
 export const CLAUDE_PERSON = 'Claude (IA)'
+
+// ---------- Sprints ----------
+
+export type SprintStatus = 'futuro' | 'activo' | 'completado'
+export const SPRINT_STATUS_LABEL: Record<SprintStatus, string> = { futuro: 'Futuro', activo: 'Activo', completado: 'Completado' }
+
+export interface Sprint {
+  id: number
+  projectId: number
+  number: number
+  name: string
+  goal: string
+  /** Fechas locales AAAA-MM-DD (null = sin fechas aún). */
+  startDate: string | null
+  endDate: string | null
+  status: SprintStatus
+  completedAt: string | null
+  createdAt: string
+}
+
+export interface SprintInput {
+  name?: string
+  goal?: string
+  startDate?: string | null
+  endDate?: string | null
+}
+
+/** Al completar un sprint: a dónde van las tarjetas sin terminar. */
+export interface CompleteSprintInput {
+  moveTo: 'backlog' | number
+}
+
+/** Agrupación estilo Jira: por hacer (gris), en curso (azul), hecho (verde). */
+export function statusGroup(column: ColumnId): 'todo' | 'doing' | 'done' {
+  if (column === 'hecho') return 'done'
+  if (column === 'backlog' || column === 'por_hacer') return 'todo'
+  return 'doing'
+}

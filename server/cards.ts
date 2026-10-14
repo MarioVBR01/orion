@@ -116,6 +116,21 @@ export function createCardsRepo(db: Db) {
     return r
   }
 
+  /** Nombre del sprint (para el historial); valida que exista en el proyecto y no esté completado. */
+  function sprintName(projectId: number, sprintId: number | null | undefined, opts: { allowCompleted?: boolean } = {}): string | null {
+    if (sprintId === null || sprintId === undefined) return null
+    const s = db.prepare('SELECT name, status FROM sprints WHERE id = ? AND project_id = ?').get(sprintId, projectId) as
+      | { name: string; status: string }
+      | undefined
+    if (!s) throw new RuleError('El sprint no existe en este proyecto.')
+    if (s.status === 'completado' && !opts.allowCompleted) throw new RuleError(`El sprint "${s.name}" ya está completado.`)
+    return s.name
+  }
+
+  function currentSprintName(projectId: number, sprintId: number | null): string | null {
+    return sprintId === null ? null : sprintName(projectId, sprintId, { allowCompleted: true })
+  }
+
   function lastOrder(projectId: number, column: ColumnId): string | null {
     const r = db
       .prepare('SELECT ord FROM cards WHERE project_id = ? AND column_id = ? AND archived = 0 ORDER BY ord DESC LIMIT 1')
@@ -186,11 +201,12 @@ export function createCardsRepo(db: Db) {
         const column = input.column ?? 'backlog'
         const err = moveError(actor, 'backlog', column)
         if (err) throw new RuleError(err)
+        sprintName(projectId, input.sprintId)
         const at = now()
         db.prepare(
           `INSERT INTO cards (project_id, number, title, type, priority, column_id, ord, labels, assignee, description_md,
-             report, acceptance, attachments, source_observation_ids, created_by, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             report, acceptance, attachments, source_observation_ids, sprint_id, created_by, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         ).run(
           projectId,
           number,
@@ -206,6 +222,7 @@ export function createCardsRepo(db: Db) {
           JSON.stringify(input.acceptance ?? []),
           JSON.stringify(extra.attachments ?? []),
           JSON.stringify(extra.sourceObservationIds ?? []),
+          input.sprintId ?? null,
           extra.createdBy ?? actor,
           at,
           at,
@@ -232,7 +249,9 @@ export function createCardsRepo(db: Db) {
           prUrl: ['pr_url', (v: string | null) => v || null],
           commitSha: ['commit_sha', (v: string | null) => v || null],
           archived: ['archived', (v: boolean) => (v ? 1 : 0)],
+          sprintId: ['sprint_id', (v: number | null) => v],
         }
+        const newSprint = patch.sprintId !== undefined ? sprintName(projectId, patch.sprintId) : undefined
         const sets: string[] = []
         const values: Array<string | number | null> = []
         const changed: string[] = []
@@ -250,6 +269,8 @@ export function createCardsRepo(db: Db) {
 
         if (patch.archived !== undefined && changed.length === 1) {
           log(card, actor, patch.archived ? 'archivada' : 'restaurada')
+        } else if (changed.length === 1 && patch.sprintId !== undefined) {
+          log(card, actor, 'editada', currentSprintName(projectId, card.sprint_id), newSprint ?? null, 'sprint')
         } else if (changed.length === 1 && patch.assignee !== undefined) {
           log(card, actor, 'editada', card.assignee, patch.assignee, 'asignado')
         } else {
@@ -275,6 +296,11 @@ export function createCardsRepo(db: Db) {
           } else if (op.action === 'assign') {
             db.prepare('UPDATE cards SET assignee = ?, updated_at = ? WHERE id = ?').run(op.assignee, now(), card.id)
             log(card, actor, 'editada', card.assignee, op.assignee, 'asignado')
+          } else if (op.action === 'sprint') {
+            const name = sprintName(projectId, op.sprintId)
+            if (card.sprint_id === op.sprintId) continue
+            db.prepare('UPDATE cards SET sprint_id = ?, updated_at = ? WHERE id = ?').run(op.sprintId, now(), card.id)
+            log(card, actor, 'editada', currentSprintName(projectId, card.sprint_id), name, 'sprint')
           } else if (op.action === 'label') {
             const labels = cleanLabels([...(JSON.parse(card.labels) as string[]), op.label])
             db.prepare('UPDATE cards SET labels = ?, updated_at = ? WHERE id = ?').run(JSON.stringify(labels), now(), card.id)
