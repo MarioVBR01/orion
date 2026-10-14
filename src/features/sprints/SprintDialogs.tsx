@@ -3,8 +3,8 @@ import { Modal } from '@/components/ui'
 import { errorMessage, useToast } from '@/components/Toast'
 import { useSprintMutations } from '@/lib/api'
 import { useCurrentProject } from '@/features/project/ProjectContext'
-import { addDays, daysBetween, toIsoDate } from '@shared/sprintDates'
-import type { Card, Sprint } from '@shared/types'
+import { addDays, daysBetween, formatRange, toIsoDate } from '@shared/sprintDates'
+import type { Sprint } from '@shared/types'
 
 /** Crear, editar o iniciar un sprint (nombre, fechas y objetivo). */
 export function SprintFormDialog({ mode, sprint, onClose }: { mode: 'crear' | 'editar' | 'iniciar'; sprint?: Sprint; onClose: () => void }) {
@@ -26,14 +26,14 @@ export function SprintFormDialog({ mode, sprint, onClose }: { mode: 'crear' | 'e
       if (mode === 'crear') await m.create.mutateAsync(input)
       else if (mode === 'editar') await m.update.mutateAsync({ id: sprint!.id, ...input })
       else await m.start.mutateAsync({ id: sprint!.id, ...input })
-      toast.success(mode === 'crear' ? 'Sprint creado.' : mode === 'editar' ? 'Sprint actualizado.' : 'Sprint iniciado.')
+      toast.success(mode === 'crear' ? 'Sprint registrado.' : mode === 'editar' ? 'Sprint actualizado.' : 'Sprint iniciado.')
       onClose()
     } catch (err) {
       toast.error(errorMessage(err))
     }
   }
 
-  const title = mode === 'crear' ? 'Crear sprint' : mode === 'editar' ? `Editar ${sprint?.name}` : `Iniciar ${sprint?.name}`
+  const title = mode === 'crear' ? 'Registrar sprint' : mode === 'editar' ? `Editar ${sprint?.name}` : `Iniciar ${sprint?.name}`
   return (
     <Modal
       open
@@ -50,7 +50,7 @@ export function SprintFormDialog({ mode, sprint, onClose }: { mode: 'crear' | 'e
     >
       <form id="sprint-form" onSubmit={submit} className="space-y-4">
         {mode === 'iniciar' && (
-          <p className="text-sm text-gray-600">Las tarjetas de este sprint pasan a ser el trabajo comprometido; Claude las tomará primero.</p>
+          <p className="text-sm text-gray-600">El sprint quedará como activo; solo puede haber uno a la vez.</p>
         )}
         <div>
           <label className="label" htmlFor="sp-name">Nombre del sprint</label>
@@ -99,25 +99,24 @@ export function SprintFormDialog({ mode, sprint, onClose }: { mode: 'crear' | 'e
   )
 }
 
-/** Completar el sprint activo: elegir a dónde van las tarjetas sin terminar. */
-export function CompleteSprintDialog({ sprint, cards, sprints, onClose }: { sprint: Sprint; cards: Card[]; sprints: Sprint[]; onClose: () => void }) {
+/** Completar un sprint (el activo, o uno futuro para registrarlo como ya terminado). */
+export function CompleteSprintDialog({ sprint, onClose }: { sprint: Sprint; onClose: () => void }) {
   const project = useCurrentProject()
   const toast = useToast()
   const m = useSprintMutations(project.id)
-  const done = cards.filter((c) => c.column === 'hecho').length
-  const open = cards.length - done
-  const targets = sprints.filter((s) => s.status === 'futuro')
-  const [moveTo, setMoveTo] = useState<string>('backlog')
+  const [editDates, setEditDates] = useState(!sprint.startDate || !sprint.endDate)
 
   async function submit() {
     try {
-      await m.complete.mutateAsync({ id: sprint.id, moveTo: moveTo === 'backlog' ? 'backlog' : Number(moveTo) })
-      toast.success(`${sprint.name} completado.`)
+      await m.complete.mutateAsync({ id: sprint.id, moveTo: 'backlog' })
+      toast.success(`${sprint.name} registrado como completado.`)
       onClose()
     } catch (err) {
       toast.error(errorMessage(err))
     }
   }
+
+  if (editDates) return <SprintFormDialog mode="editar" sprint={sprint} onClose={() => setEditDates(false)} />
 
   return (
     <Modal
@@ -131,22 +130,13 @@ export function CompleteSprintDialog({ sprint, cards, sprints, onClose }: { spri
         </>
       }
     >
-      <div className="space-y-4 text-sm">
+      <div className="space-y-3 text-sm">
         <p>
-          Este sprint contiene <strong>{done}</strong> actividad(es) terminada(s) y <strong>{open}</strong> sin terminar.
+          Se registrará <strong>{sprint.name}</strong>
+          {sprint.startDate && sprint.endDate ? <> ({formatRange(sprint.startDate, sprint.endDate)})</> : null} como completado.
         </p>
-        {open > 0 ? (
-          <div>
-            <label className="label" htmlFor="sp-move">Mover las actividades sin terminar a</label>
-            <select id="sp-move" className="input" value={moveTo} onChange={(e) => setMoveTo(e.target.value)}>
-              <option value="backlog">Backlog</option>
-              {targets.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-          </div>
-        ) : (
-          <p className="text-green-700">¡Todas las actividades están terminadas!</p>
-        )}
-        <p className="text-xs text-gray-500">El sprint completado se conserva como evidencia con sus tarjetas terminadas.</p>
+        {sprint.status === 'futuro' && <p className="text-gray-500">Útil para registrar sprints que ya terminaron, sin necesidad de iniciarlos.</p>}
+        <p className="text-xs text-gray-500">Las tarjetas del tablero no cambian. Podrás editar el registro después si hace falta.</p>
       </div>
     </Modal>
   )

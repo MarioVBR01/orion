@@ -38,6 +38,22 @@ function checkDates(start: string | null | undefined, end: string | null | undef
 }
 
 export function createSprintsRepo(db: Db) {
+  /** Las fechas de un sprint no pueden cruzarse con las de otro del mismo proyecto. */
+  function checkOverlap(projectId: number, start: string | null | undefined, end: string | null | undefined, exceptId?: number) {
+    if (!start || !end) return
+    const other = db
+      .prepare(
+        `SELECT name, start_date, end_date FROM sprints
+         WHERE project_id = ? AND id <> ? AND start_date IS NOT NULL AND end_date IS NOT NULL
+           AND start_date <= ? AND end_date >= ? LIMIT 1`,
+      )
+      .get(projectId, exceptId ?? 0, end, start) as { name: string; start_date: string; end_date: string } | undefined
+    if (other) {
+      const f = (d: string) => d.split('-').reverse().join('/')
+      throw new RuleError(`Las fechas se cruzan con "${other.name}" (${f(other.start_date)} – ${f(other.end_date)}).`)
+    }
+  }
+
   const cards = createCardsRepo(db)
 
   function ensureProject(projectId: number) {
@@ -70,6 +86,7 @@ export function createSprintsRepo(db: Db) {
     create(projectId: number, input: SprintInput): Sprint {
       ensureProject(projectId)
       checkDates(input.startDate, input.endDate)
+      checkOverlap(projectId, input.startDate, input.endDate)
       return tx(db, () => {
         const { n } = db.prepare('SELECT COALESCE(MAX(number), 0) + 1 AS n FROM sprints WHERE project_id = ?').get(projectId) as { n: number }
         const { code } = db.prepare('SELECT code FROM projects WHERE id = ?').get(projectId) as { code: string }
@@ -85,7 +102,8 @@ export function createSprintsRepo(db: Db) {
       const start = input.startDate !== undefined ? input.startDate || null : r.start_date
       const end = input.endDate !== undefined ? input.endDate || null : r.end_date
       checkDates(start, end)
-      if (r.status === 'activo' && (!start || !end)) throw new RuleError('Un sprint activo necesita fechas de inicio y fin.')
+      checkOverlap(projectId, start, end, id)
+      if (r.status !== 'futuro' && (!start || !end)) throw new RuleError('Un sprint activo necesita fechas de inicio y fin.')
       db.prepare('UPDATE sprints SET name = ?, goal = ?, start_date = ?, end_date = ? WHERE id = ?').run(
         input.name !== undefined ? input.name.trim() || r.name : r.name,
         input.goal !== undefined ? input.goal.trim() : r.goal,
@@ -106,6 +124,7 @@ export function createSprintsRepo(db: Db) {
         const end = input.endDate ?? r.end_date
         if (!start || !end) throw new RuleError('Indica las fechas de inicio y fin del sprint.')
         checkDates(start, end)
+        checkOverlap(projectId, start, end, id)
         db.prepare("UPDATE sprints SET status = 'activo', start_date = ?, end_date = ?, name = ?, goal = ? WHERE id = ?").run(
           start,
           end,
@@ -117,11 +136,15 @@ export function createSprintsRepo(db: Db) {
       })
     },
 
-    /** Completa el sprint; las tarjetas no terminadas van al Backlog o a otro sprint (no completado). */
+    /**
+     * Completa el sprint (el activo o uno futuro, para registrar sprints ya pasados).
+     * Si alguna tarjeta quedó asociada al sprint y no está terminada, va al Backlog o al sprint indicado.
+     */
     complete(projectId: number, id: number, input: CompleteSprintInput, actor: string): Sprint {
       return tx(db, () => {
         const r = row(projectId, id)
-        if (r.status !== 'activo') throw new RuleError('Solo se puede completar el sprint activo.')
+        if (r.status === 'completado') throw new RuleError('El sprint ya está completado.')
+        if (!r.start_date || !r.end_date) throw new RuleError('Indica las fechas del sprint antes de completarlo.')
         const target = input.moveTo === 'backlog' ? null : input.moveTo
         if (target !== null) {
           if (target === id) throw new RuleError('Elige otro sprint para las tarjetas sin terminar.')
@@ -140,8 +163,7 @@ export function createSprintsRepo(db: Db) {
     /** Elimina el sprint; sus tarjetas vuelven al Backlog (sin sprint). */
     remove(projectId: number, id: number) {
       tx(db, () => {
-        const r = row(projectId, id)
-        if (r.status === 'completado') throw new RuleError('Un sprint completado se conserva como evidencia; no se puede eliminar.')
+        row(projectId, id)
         db.prepare('UPDATE cards SET sprint_id = NULL WHERE project_id = ? AND sprint_id = ?').run(projectId, id)
         db.prepare('DELETE FROM sprints WHERE id = ?').run(id)
       })

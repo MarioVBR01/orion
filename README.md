@@ -31,9 +31,9 @@ Por revisar ─(tú)─▶ Backlog ─(Claude)─▶ Por hacer ▶ En progreso �
 1. **Por revisar:** registra cada reporte con *Nueva observación*: Título, Tipo (Bug, Mejora o Duda), Descripción y
    Screenshots (botón *Subir imágenes* o pegar con Ctrl+V).
 2. Revisa el reporte y elige **Pasar al Backlog** (de a uno o en lote), **Pedir más información** o **Rechazar**.
-3. **Sprints** (como el backlog de Jira): crea sprints con sus fechas, arrastra actividades del Backlog a cada sprint, *Iniciar sprint*
-   y, al terminar, *Completar sprint* (lo pendiente pasa al Backlog o al siguiente sprint). Claude toma primero las tarjetas del
-   sprint activo. En el **Tablero** puedes filtrar por sprint y ordenar arrastrando: lo de arriba va primero.
+3. En el **Tablero** (Kanban), ordena el Backlog arrastrando: lo de arriba va primero. Lo que pongas en *Por hacer* va antes que el
+   Backlog. **Sprints** es el registro de los sprints del proyecto (nombre, fechas, objetivo y estado); puedes registrar sprints
+   pasados y completarlos directamente. Cada Daily Scrum indica a qué sprint pertenece su fecha.
 4. **Trabajar con Claude** (botón en la cabecera del proyecto):
    1. *Preparar para Claude* (una vez): deja la carpeta lista.
    2. *Abrir en VS Code*, abrir Claude Code y pegar la orden ("Trabaja el backlog de ORION…").

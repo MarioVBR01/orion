@@ -58,9 +58,9 @@ describe('sprints', () => {
     const hist = (await request(app).get(api('/cards/2/history'))).body
     expect(hist[0]).toMatchObject({ action: 'editada', detail: 'sprint', from: 'SCAL Sprint 1', to: 'SCAL Sprint 2' })
 
-    // no se pueden asignar tarjetas a un sprint completado ni eliminarlo
+    // no se pueden asignar tarjetas a un sprint completado; sí se puede eliminar del registro
     expect((await request(app).patch(api('/cards/2')).send({ sprintId: s1.id })).body.error).toMatch(/completado/)
-    expect((await request(app).delete(api(`/sprints/${s1.id}`))).status).toBe(400)
+    expect((await request(app).delete(api(`/sprints/${s1.id}`))).status).toBe(204)
   })
 
   it('eliminar un sprint devuelve sus tarjetas al Backlog; sprint de otro proyecto no vale', async () => {
@@ -75,6 +75,31 @@ describe('sprints', () => {
     await request(app).post('/api/projects').send({ name: 'Otro', code: 'OTR' })
     const foreign = (await request(app).post('/api/projects/2/sprints').send({})).body
     expect((await card('B', { sprintId: foreign.id })).body.error).toMatch(/no existe/)
+  })
+})
+
+describe('registro de sprints', () => {
+  it('las fechas no pueden cruzarse entre sprints', async () => {
+    await request(app).post(api('/sprints')).send({ name: 'Sprint 0', startDate: '2026-09-14', endDate: '2026-09-28' })
+    const cross = await request(app).post(api('/sprints')).send({ startDate: '2026-09-28', endDate: '2026-10-11' })
+    expect(cross.status).toBe(400)
+    expect(cross.body.error).toContain('se cruzan con "Sprint 0" (14/09/2026 – 28/09/2026)')
+    const ok = await request(app).post(api('/sprints')).send({ startDate: '2026-09-29', endDate: '2026-10-12' })
+    expect(ok.status).toBe(201)
+    const edit = await request(app).patch(api(`/sprints/${ok.body.id}`)).send({ startDate: '2026-09-20' })
+    expect(edit.status).toBe(400)
+  })
+
+  it('un sprint pasado se registra completándolo directamente (sin iniciarlo)', async () => {
+    const noDates = (await request(app).post(api('/sprints')).send({})).body
+    expect((await request(app).post(api(`/sprints/${noDates.id}/complete`)).send({})).body.error).toMatch(/fechas/)
+    const past = (await request(app).post(api('/sprints')).send({ name: 'Sprint 0', startDate: '2026-09-14', endDate: '2026-09-28' })).body
+    const done = await request(app).post(api(`/sprints/${past.id}/complete`)).send({})
+    expect(done.body).toMatchObject({ status: 'completado', name: 'Sprint 0' })
+    // se puede corregir el registro (objetivo) aunque esté completado
+    const fixed = await request(app).patch(api(`/sprints/${past.id}`)).send({ goal: 'Análisis y diseño' })
+    expect(fixed.body.goal).toBe('Análisis y diseño')
+    expect((await request(app).post(api(`/sprints/${past.id}/complete`)).send({})).body.error).toMatch(/ya está completado/)
   })
 })
 

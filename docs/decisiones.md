@@ -95,3 +95,11 @@ El usuario decidió no usar Firebase: ORION será local y solo lo usará él. Fi
 55. **El sprint no reemplaza las columnas:** el tablero sigue mostrando todas las tarjetas, con un filtro por sprint que se recuerda por proyecto (Todos, Sprint activo, un sprint o Sin sprint).
 56. **Claude prioriza el sprint activo:** `orion siguiente` toma primero las tarjetas del sprint activo (Por hacer y luego Backlog) y después el resto.
 57. **Daily ↔ sprint:** cada daily muestra a qué sprint pertenece su fecha, con "día N de M" y el objetivo, en la lista, en el editor y en el PDF.
+
+## Sprints como registro (pedido del usuario)
+
+58. **La pestaña Sprints solo registra sprints:** nombre, fechas, duración, objetivo y estado, con el sprint activo destacado (día N de M y barra de tiempo). Las tarjetas se gestionan en el tablero Kanban y en Por revisar. Se quitan de la vista la lista de tarjetas por sprint, el Backlog, el arrastre, el selector de sprint en la tarjeta y el filtro por sprint del tablero. Esto reemplaza los puntos 53 y 55.
+59. **Registrar sprints pasados:** un sprint futuro con fechas se puede *Completar* directamente, sin iniciarlo. Para iniciar o completar hacen falta fechas.
+60. **Las fechas no se cruzan entre sprints** del mismo proyecto. Así cada día pertenece a un solo sprint, y el Daily Scrum lo muestra sin ambigüedad.
+61. **Cualquier sprint se puede editar o eliminar** porque es solo un registro: eliminarlo no afecta al tablero. Esto reemplaza la restricción del punto 54.
+62. **El soporte de `sprintId` en tarjetas** (API y `orion siguiente`, que prioriza el sprint activo) se conserva en el servidor por compatibilidad, pero no tiene efecto mientras la interfaz no asigne tarjetas a sprints.

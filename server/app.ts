@@ -258,7 +258,7 @@ export function createApp(db: Db, opts: { staticDir?: string; uploadsDir?: strin
     res.json(sprints.start(id(req.params.pid), id(req.params.id), sprintInput.parse(req.body)))
   })
   api.post('/projects/:pid/sprints/:id/complete', (req, res) => {
-    const body = z.object({ moveTo: z.union([z.literal('backlog'), z.number().int().positive()]) }).parse(req.body)
+    const body = z.object({ moveTo: z.union([z.literal('backlog'), z.number().int().positive()]).default('backlog') }).parse(req.body ?? {})
     res.json(sprints.complete(id(req.params.pid), id(req.params.id), body, actor()))
   })
   api.delete('/projects/:pid/sprints/:id', (req, res) => {
